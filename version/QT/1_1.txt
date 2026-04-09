@@ -1,0 +1,1149 @@
+#include <QApplication>
+#include <QMainWindow>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QGridLayout>
+#include <QPushButton>
+#include <QListWidget>
+#include <QLabel>
+#include <QListWidgetItem>
+#include <QMessageBox>
+#include <QStackedWidget>
+#include <QGroupBox>
+#include <QFrame>
+#include <QAction>
+#include <QMenuBar>
+#include <QMenu>
+#include <QFileDialog>
+#include <QCheckBox>
+#include <QStatusBar>
+#include <QTimer>
+#include <QDateTime>
+#include <QTextStream>
+#include <QSerialPort>
+#include <QSerialPortInfo>
+#include <QValueAxis>
+#include <QLineSeries>
+#include <QChart>
+#include <QChartView>
+#include <QPen>
+#include <QBrush>
+#include <QRegularExpression>
+#include <QFile>
+#include <QDebug>
+#include <QCloseEvent>
+#include <QtMath>
+
+QT_CHARTS_USE_NAMESPACE
+
+static const QString VERSION = "v2.0.0-serial-12ch";
+
+class SerialManager : public QObject
+{
+    Q_OBJECT
+public:
+    explicit SerialManager(QObject *parent = nullptr)
+        : QObject(parent)
+    {
+        connect(&serial_, &QSerialPort::readyRead, this, &SerialManager::onReadyRead);
+        connect(&serial_, &QSerialPort::errorOccurred, this, &SerialManager::onErrorOccurred);
+    }
+
+    struct PortItem {
+        QString portName;
+        QString description;
+        QString manufacturer;
+        QString serialNumber;
+        QString systemLocation;
+    };
+
+    void scanPorts()
+    {
+        QList<PortItem> ports;
+        const auto infos = QSerialPortInfo::availablePorts();
+        for (const auto &info : infos) {
+            PortItem item;
+            item.portName = info.portName();
+            item.description = info.description();
+            item.manufacturer = info.manufacturer();
+            item.serialNumber = info.serialNumber();
+            item.systemLocation = info.systemLocation();
+            ports.append(item);
+        }
+        emit scanFinished(ports);
+    }
+
+    bool connectPort(const QString &portName, qint32 baudRate = QSerialPort::Baud115200)
+    {
+        if (serial_.isOpen()) {
+            serial_.close();
+        }
+
+        serial_.setPortName(portName);
+        serial_.setBaudRate(baudRate);
+        serial_.setDataBits(QSerialPort::Data8);
+        serial_.setParity(QSerialPort::NoParity);
+        serial_.setStopBits(QSerialPort::OneStop);
+        serial_.setFlowControl(QSerialPort::NoFlowControl);
+
+        if (!serial_.open(QIODevice::ReadWrite)) {
+            emit connectFailed(QString("打开串口失败：%1").arg(serial_.errorString()));
+            return false;
+        }
+
+        buffer_.clear();
+        packetValues_.clear();
+        emit connectSuccess(portName);
+        return true;
+    }
+
+    void disconnectPort()
+    {
+        if (serial_.isOpen()) {
+            serial_.close();
+        }
+        buffer_.clear();
+        packetValues_.clear();
+        emit disconnected();
+    }
+
+    bool isConnected() const
+    {
+        return serial_.isOpen();
+    }
+
+    void setMonitoringEnabled(bool enabled)
+    {
+        monitoringEnabled_ = enabled;
+        if (!enabled) {
+            packetValues_.clear();
+        }
+    }
+
+signals:
+    void scanFinished(const QList<SerialManager::PortItem> &ports);
+    void connectSuccess(const QString &portName);
+    void connectFailed(const QString &errorMsg);
+    void dataReceived(const QVector<double> &values);
+    void batteryReceived(int value);
+    void notifyError(const QString &errorMsg);
+    void disconnected();
+
+private slots:
+    void onReadyRead()
+    {
+        const QByteArray data = serial_.readAll();
+        if (data.isEmpty()) return;
+
+        QString text = QString::fromUtf8(data);
+        parseBattery(text);
+
+        if (!monitoringEnabled_) return;
+
+        buffer_ += text;
+        parseTemperatureBuffer();
+    }
+
+    void onErrorOccurred(QSerialPort::SerialPortError error)
+    {
+        if (error == QSerialPort::NoError) return;
+
+        if (error == QSerialPort::ResourceError || error == QSerialPort::DeviceNotFoundError) {
+            const QString msg = serial_.errorString();
+            if (serial_.isOpen()) {
+                serial_.close();
+            }
+            emit notifyError(msg);
+            emit disconnected();
+        }
+    }
+
+private:
+    void parseBattery(const QString &text)
+    {
+        static QRegularExpression re("batt(?:e)?ry[:\\s]*(\\d+)", QRegularExpression::CaseInsensitiveOption);
+        auto it = re.globalMatch(text);
+        while (it.hasNext()) {
+            auto m = it.next();
+            bool ok = false;
+            int v = m.captured(1).toInt(&ok);
+            if (ok) emit batteryReceived(v);
+        }
+    }
+
+    void parseTemperatureBuffer()
+    {
+        static QRegularExpression re("T(1[0-2]|[1-9]):(-?\\d+(?:\\.\\d+)?),?");
+
+        while (true) {
+            QRegularExpressionMatch m = re.match(buffer_);
+            if (!m.hasMatch()) {
+                int idx = buffer_.indexOf('T');
+                if (idx > 0) buffer_ = buffer_.mid(idx);
+                if (idx < 0 && buffer_.size() > 2048) buffer_.clear();
+                break;
+            }
+
+            int start = m.capturedStart();
+            int end = m.capturedEnd();
+
+            if (start > 0) {
+                buffer_.remove(0, start);
+                continue;
+            }
+
+            int chIdx = m.captured(1).toInt() - 1;
+            double value = m.captured(2).toDouble();
+
+            if (chIdx == 0) {
+                packetValues_.clear();
+            }
+
+            packetValues_[chIdx] = value;
+            buffer_.remove(0, end);
+
+            if (chIdx == 11 && packetValues_.size() == 12) {
+                QVector<double> packet(12, qQNaN());
+                for (int i = 0; i < 12; ++i) {
+                    packet[i] = packetValues_.value(i, qQNaN());
+                }
+                packetValues_.clear();
+                emit dataReceived(packet);
+            }
+        }
+    }
+
+private:
+    QSerialPort serial_;
+    QString buffer_;
+    bool monitoringEnabled_ = false;
+    QMap<int, double> packetValues_;
+};
+
+class ConnectionPage : public QWidget
+{
+    Q_OBJECT
+public:
+    explicit ConnectionPage(SerialManager *serialManager, QWidget *parent = nullptr)
+        : QWidget(parent), serialManager_(serialManager)
+    {
+        connect(serialManager_, &SerialManager::scanFinished, this, &ConnectionPage::onScanFinished);
+        connect(serialManager_, &SerialManager::connectSuccess, this, &ConnectionPage::onConnectSuccess);
+        connect(serialManager_, &SerialManager::connectFailed, this, &ConnectionPage::onConnectFailed);
+        initUi();
+    }
+
+signals:
+    void requestSwitchToMonitorPage();
+    void requestSetConnectionStatus(const QString &text, bool connected);
+    void requestSetStatusMessage(const QString &text);
+
+private slots:
+    void startScan()
+    {
+        deviceList_->clear();
+        ports_.clear();
+        selectedPort_.clear();
+        connectButton_->setEnabled(false);
+        infoLabel_->setText("请扫描并选择串口设备");
+        setStatus("正在扫描串口设备...");
+        serialManager_->scanPorts();
+    }
+
+    void onScanFinished(const QList<SerialManager::PortItem> &ports)
+    {
+        ports_ = ports;
+        if (ports.isEmpty()) {
+            setStatus("未发现串口设备");
+            return;
+        }
+
+        setStatus(QString("扫描完成，共发现 %1 个串口设备").arg(ports.size()));
+        for (const auto &p : ports) {
+            QString name = p.description.isEmpty() ? "未知设备" : p.description;
+            auto *item = new QListWidgetItem(QString("%1 (%2)").arg(name, p.portName));
+            item->setData(Qt::UserRole, p.portName);
+            deviceList_->addItem(item);
+        }
+    }
+
+    void onDeviceSelected(QListWidgetItem *item)
+    {
+        selectedPort_ = item->data(Qt::UserRole).toString();
+        connectButton_->setEnabled(true);
+
+        SerialManager::PortItem chosen;
+        for (const auto &p : ports_) {
+            if (p.portName == selectedPort_) {
+                chosen = p;
+                break;
+            }
+        }
+
+        infoLabel_->setText(
+            QString("端口：%1\n描述：%2\n厂商：%3\n位置：%4")
+                .arg(chosen.portName)
+                .arg(chosen.description.isEmpty() ? "未知" : chosen.description)
+                .arg(chosen.manufacturer.isEmpty() ? "未知" : chosen.manufacturer)
+                .arg(chosen.systemLocation.isEmpty() ? "未知" : chosen.systemLocation)
+        );
+    }
+
+    void connectDevice()
+    {
+        if (selectedPort_.isEmpty()) return;
+
+        setStatus("正在连接串口设备...");
+        connectButton_->setEnabled(false);
+        scanButton_->setEnabled(false);
+
+        serialManager_->connectPort(selectedPort_, QSerialPort::Baud115200);
+    }
+
+    void onConnectSuccess(const QString &portName)
+    {
+        setStatus("设备已连接");
+        scanButton_->setEnabled(true);
+        emit requestSetConnectionStatus(QString("已连接 %1").arg(portName), true);
+        emit requestSwitchToMonitorPage();
+    }
+
+    void onConnectFailed(const QString &errorMsg)
+    {
+        setStatus("连接失败");
+        connectButton_->setEnabled(true);
+        scanButton_->setEnabled(true);
+        QMessageBox::warning(this, "连接失败", errorMsg);
+    }
+
+private:
+    void setStatus(const QString &text)
+    {
+        statusLabel_->setText(text);
+        emit requestSetStatusMessage(text);
+    }
+
+    void initUi()
+    {
+        auto *layout = new QVBoxLayout(this);
+        layout->setSpacing(8);
+        layout->setContentsMargins(12, 12, 12, 12);
+
+        auto *titleLabel = new QLabel("设备连接");
+        QFont titleFont;
+        titleFont.setPointSize(12);
+        titleFont.setBold(true);
+        titleLabel->setFont(titleFont);
+        layout->addWidget(titleLabel);
+
+        auto *sep = new QFrame;
+        sep->setFrameShape(QFrame::HLine);
+        sep->setFrameShadow(QFrame::Sunken);
+        layout->addWidget(sep);
+
+        statusLabel_ = new QLabel("就绪");
+        layout->addWidget(statusLabel_);
+
+        auto *listGroup = new QGroupBox("可用串口设备列表");
+        auto *listLayout = new QVBoxLayout(listGroup);
+        deviceList_ = new QListWidget;
+        deviceList_->setMinimumHeight(320);
+        connect(deviceList_, &QListWidget::itemClicked, this, &ConnectionPage::onDeviceSelected);
+        listLayout->addWidget(deviceList_);
+        layout->addWidget(listGroup);
+
+        auto *infoGroup = new QGroupBox("设备信息");
+        auto *infoLayout = new QVBoxLayout(infoGroup);
+        infoLabel_ = new QLabel("请扫描并选择串口设备");
+        infoLabel_->setWordWrap(true);
+        infoLayout->addWidget(infoLabel_);
+        layout->addWidget(infoGroup);
+
+        auto *buttonLayout = new QHBoxLayout;
+        scanButton_ = new QPushButton("扫描设备");
+        scanButton_->setMinimumHeight(32);
+        connect(scanButton_, &QPushButton::clicked, this, &ConnectionPage::startScan);
+        buttonLayout->addWidget(scanButton_);
+
+        connectButton_ = new QPushButton("连接设备");
+        connectButton_->setMinimumHeight(32);
+        connectButton_->setEnabled(false);
+        connect(connectButton_, &QPushButton::clicked, this, &ConnectionPage::connectDevice);
+        buttonLayout->addWidget(connectButton_);
+
+        layout->addLayout(buttonLayout);
+    }
+
+private:
+    SerialManager *serialManager_;
+    QList<SerialManager::PortItem> ports_;
+    QString selectedPort_;
+
+    QLabel *statusLabel_ = nullptr;
+    QLabel *infoLabel_ = nullptr;
+    QListWidget *deviceList_ = nullptr;
+    QPushButton *scanButton_ = nullptr;
+    QPushButton *connectButton_ = nullptr;
+};
+
+class DataMonitorPage : public QWidget
+{
+    Q_OBJECT
+public:
+    static const int NUM_CHANNELS = 12;
+
+    explicit DataMonitorPage(SerialManager *serialManager, QWidget *parent = nullptr)
+        : QWidget(parent), serialManager_(serialManager)
+    {
+        channelNames_
+                << "通道1" << "通道2" << "通道3" << "通道4"
+                << "通道5" << "通道6" << "通道7" << "通道8"
+                << "通道9" << "通道10" << "通道11" << "通道12";
+
+        channelColors_
+                << QColor("#e74c3c") << QColor("#2ecc71") << QColor("#3498db") << QColor("#f39c12")
+                << QColor("#9b59b6") << QColor("#1abc9c") << QColor("#34495e") << QColor("#e67e22")
+                << QColor("#7f8c8d") << QColor("#d35400") << QColor("#16a085") << QColor("#8e44ad");
+
+        thresholdValues_ = {150, 155, 160, 165, 170, 175, 180, 185, 190, 195, 200, 205};
+
+        channelData_.resize(NUM_CHANNELS);
+        peakValues_.fill(-1e100, NUM_CHANNELS);
+        prevValues_.fill(qQNaN(), NUM_CHANNELS);
+        curveVisible_.fill(true, NUM_CHANNELS);
+
+        connect(serialManager_, &SerialManager::dataReceived, this, &DataMonitorPage::onDataReceived);
+        connect(serialManager_, &SerialManager::batteryReceived, this, &DataMonitorPage::onBatteryReceived);
+        connect(serialManager_, &SerialManager::notifyError, this, &DataMonitorPage::onNotifyError);
+        connect(serialManager_, &SerialManager::disconnected, this, &DataMonitorPage::onDisconnected);
+
+        initUi();
+        initChart();
+
+        chartRefreshTimer_ = new QTimer(this);
+        chartRefreshTimer_->setInterval(100);
+        connect(chartRefreshTimer_, &QTimer::timeout, this, [this]() {
+            if (chartDirty_) {
+                updateAllSeries();
+                chartDirty_ = false;
+            }
+        });
+        chartRefreshTimer_->start();
+    }
+
+signals:
+    void requestSetStatusMessage(const QString &text);
+    void requestSetConnectionStatus(const QString &text, bool connected);
+    void requestSetBatteryLevel(int value);
+    void requestSwitchToConnectionPage();
+
+public slots:
+    void setReady()
+    {
+        setStatus("设备已连接，就绪");
+        startButton_->setEnabled(true);
+        backButton_->setEnabled(true);
+    }
+
+private slots:
+    void startMonitoring()
+    {
+        startTimeMs_ = QDateTime::currentMSecsSinceEpoch();
+        prevTimeSec_ = qQNaN();
+        clearData();
+
+        serialManager_->setMonitoringEnabled(true);
+        startButton_->setEnabled(false);
+        stopButton_->setEnabled(true);
+        backButton_->setEnabled(false);
+        setStatus("监控中...");
+    }
+
+    void stopMonitoring()
+    {
+        serialManager_->setMonitoringEnabled(false);
+        startButton_->setEnabled(true);
+        stopButton_->setEnabled(false);
+        backButton_->setEnabled(true);
+        setStatus("监控已停止");
+    }
+
+    void clearData()
+    {
+        timeData_.clear();
+        for (int i = 0; i < NUM_CHANNELS; ++i) {
+            channelData_[i].clear();
+            peakValues_[i] = -1e100;
+            prevValues_[i] = qQNaN();
+            valueLabels_[i]->setText("--");
+            peakLabels_[i]->setText("峰值 --");
+            rateLabels_[i]->setText("变化 --");
+            lineSeries_[i]->clear();
+        }
+        prevTimeSec_ = qQNaN();
+        chartDirty_ = true;
+        axisX_->setRange(0, timeWindowSec_);
+        axisY_->setRange(0, 300);
+        updateThresholdMarkers();
+    }
+
+    void disconnectDevice()
+    {
+        serialManager_->setMonitoringEnabled(false);
+        setStatus("正在断开连接...");
+        serialManager_->disconnectPort();
+    }
+
+    void onDataReceived(const QVector<double> &values)
+    {
+        if (startTimeMs_ <= 0) return;
+
+        double relativeTime = (QDateTime::currentMSecsSinceEpoch() - startTimeMs_) / 1000.0;
+        timeData_.append(relativeTime);
+
+        double dt = qQNaN();
+        if (!qIsNaN(prevTimeSec_)) {
+            dt = relativeTime - prevTimeSec_;
+        }
+        prevTimeSec_ = relativeTime;
+
+        for (int i = 0; i < NUM_CHANNELS; ++i) {
+            double v = (i < values.size()) ? values[i] : qQNaN();
+            channelData_[i].append(v);
+
+            valueLabels_[i]->setText(qIsNaN(v) ? "--" : QString::number(v, 'f', 2));
+
+            if (!qIsNaN(v) && v > peakValues_[i]) {
+                peakValues_[i] = v;
+            }
+            if (peakValues_[i] > -1e90) {
+                peakLabels_[i]->setText(QString("峰值 %1°C").arg(peakValues_[i], 0, 'f', 2));
+            }
+
+            if (!qIsNaN(dt) && dt > 0 && !qIsNaN(prevValues_[i]) && !qIsNaN(v)) {
+                double rate = (v - prevValues_[i]) / dt;
+                QString s = QString("%1°C/s").arg(rate, 0, 'f', 2);
+                if (rate >= 0) s.prepend("+");
+                rateLabels_[i]->setText(s);
+            }
+            prevValues_[i] = v;
+        }
+
+        while (timeData_.size() > maxPoints_) {
+            timeData_.removeFirst();
+            for (int i = 0; i < NUM_CHANNELS; ++i) {
+                if (!channelData_[i].isEmpty()) {
+                    channelData_[i].removeFirst();
+                }
+            }
+        }
+
+        double currentTime = timeData_.isEmpty() ? 0.0 : timeData_.last();
+        double tMin = qMax(0.0, currentTime - timeWindowSec_);
+        axisX_->setRange(tMin, qMax(currentTime, timeWindowSec_));
+
+        ensureYRangeForThresholds();
+        chartDirty_ = true;
+    }
+
+    void onNotifyError(const QString &errorMsg)
+    {
+        setStatus("监控错误");
+        QMessageBox::warning(this, "串口错误", errorMsg);
+        startButton_->setEnabled(true);
+        stopButton_->setEnabled(false);
+        backButton_->setEnabled(true);
+    }
+
+    void onBatteryReceived(int value)
+    {
+        batteryLabel_->setText(QString("电量：%1%").arg(value));
+        emit requestSetBatteryLevel(value);
+    }
+
+    void onDisconnected()
+    {
+        startButton_->setEnabled(false);
+        stopButton_->setEnabled(false);
+        backButton_->setEnabled(false);
+        startTimeMs_ = -1;
+        batteryLabel_->setText("电量：--");
+        setStatus("已断开连接");
+        emit requestSetConnectionStatus("未连接", false);
+        emit requestSetBatteryLevel(-1);
+        emit requestSwitchToConnectionPage();
+    }
+
+    void toggleCurve(bool checked)
+    {
+        auto *cb = qobject_cast<QCheckBox*>(sender());
+        if (!cb) return;
+        int idx = cb->property("idx").toInt();
+        if (idx >= 0 && idx < NUM_CHANNELS) {
+            curveVisible_[idx] = checked;
+            lineSeries_[idx]->setVisible(checked);
+        }
+    }
+
+private:
+    void setStatus(const QString &text)
+    {
+        statusLabel_->setText(text);
+        emit requestSetStatusMessage(text);
+    }
+
+    void initUi()
+    {
+        auto *layout = new QVBoxLayout(this);
+        layout->setSpacing(8);
+        layout->setContentsMargins(12, 12, 12, 12);
+
+        auto *headerLayout = new QHBoxLayout;
+        auto *titleLabel = new QLabel("12路实时温度监控");
+        QFont titleFont;
+        titleFont.setPointSize(12);
+        titleFont.setBold(true);
+        titleLabel->setFont(titleFont);
+        headerLayout->addWidget(titleLabel);
+
+        headerLayout->addStretch();
+
+        statusLabel_ = new QLabel("未连接");
+        headerLayout->addWidget(statusLabel_);
+
+        headerLayout->addSpacing(16);
+
+        batteryLabel_ = new QLabel("电量：--");
+        headerLayout->addWidget(batteryLabel_);
+
+        headerLayout->addSpacing(16);
+
+        backButton_ = new QPushButton("断开连接");
+        backButton_->setMinimumHeight(28);
+        connect(backButton_, &QPushButton::clicked, this, &DataMonitorPage::disconnectDevice);
+        headerLayout->addWidget(backButton_);
+
+        layout->addLayout(headerLayout);
+
+        auto *sep = new QFrame;
+        sep->setFrameShape(QFrame::HLine);
+        sep->setFrameShadow(QFrame::Sunken);
+        layout->addWidget(sep);
+
+        auto *chartGroup = new QGroupBox("温度趋势图");
+        auto *chartLayout = new QVBoxLayout(chartGroup);
+        chartView_ = new QChartView;
+        chartView_->setRenderHint(QPainter::Antialiasing);
+        chartLayout->addWidget(chartView_);
+        layout->addWidget(chartGroup, 1);
+
+        auto *thresholdInfo = new QLabel("已启用默认12温区阈值");
+        layout->addWidget(thresholdInfo);
+
+        auto *chGroup = new QGroupBox("各通道状态");
+        auto *chOuter = new QGridLayout(chGroup);
+        chOuter->setSpacing(6);
+        chOuter->setContentsMargins(6, 6, 6, 6);
+
+        for (int i = 0; i < NUM_CHANNELS; ++i) {
+            auto *box = new QGroupBox;
+            auto *vbox = new QVBoxLayout(box);
+            vbox->setContentsMargins(6, 4, 6, 4);
+            vbox->setSpacing(2);
+
+            auto *cb = new QCheckBox(channelNames_[i]);
+            cb->setChecked(true);
+            cb->setProperty("idx", i);
+            cb->setStyleSheet(QString("color:%1; font-weight:bold;").arg(channelColors_[i].name()));
+            connect(cb, &QCheckBox::toggled, this, &DataMonitorPage::toggleCurve);
+            vbox->addWidget(cb);
+            checkBoxes_.append(cb);
+
+            auto *valLbl = new QLabel("--");
+            valLbl->setAlignment(Qt::AlignCenter);
+            QFont valFont;
+            valFont.setPointSize(13);
+            valFont.setBold(true);
+            valLbl->setFont(valFont);
+            vbox->addWidget(valLbl);
+
+            auto *unitLbl = new QLabel("°C");
+            unitLbl->setAlignment(Qt::AlignCenter);
+            vbox->addWidget(unitLbl);
+
+            auto *sep2 = new QFrame;
+            sep2->setFrameShape(QFrame::HLine);
+            sep2->setFrameShadow(QFrame::Sunken);
+            vbox->addWidget(sep2);
+
+            auto *peakLbl = new QLabel("峰值 --");
+            peakLbl->setAlignment(Qt::AlignCenter);
+            QFont smallFont;
+            smallFont.setPointSize(8);
+            peakLbl->setFont(smallFont);
+            vbox->addWidget(peakLbl);
+
+            auto *rateLbl = new QLabel("变化 --");
+            rateLbl->setAlignment(Qt::AlignCenter);
+            rateLbl->setFont(smallFont);
+            vbox->addWidget(rateLbl);
+
+            valueLabels_.append(valLbl);
+            peakLabels_.append(peakLbl);
+            rateLabels_.append(rateLbl);
+
+            int row = i / 4;
+            int col = i % 4;
+            chOuter->addWidget(box, row, col);
+        }
+
+        layout->addWidget(chGroup);
+
+        auto *ctrlLayout = new QHBoxLayout;
+        ctrlLayout->addStretch();
+
+        startButton_ = new QPushButton("开始监控");
+        startButton_->setMinimumHeight(30);
+        startButton_->setEnabled(false);
+        connect(startButton_, &QPushButton::clicked, this, &DataMonitorPage::startMonitoring);
+        ctrlLayout->addWidget(startButton_);
+
+        stopButton_ = new QPushButton("停止监控");
+        stopButton_->setMinimumHeight(30);
+        stopButton_->setEnabled(false);
+        connect(stopButton_, &QPushButton::clicked, this, &DataMonitorPage::stopMonitoring);
+        ctrlLayout->addWidget(stopButton_);
+
+        auto *clearButton = new QPushButton("清除数据");
+        clearButton->setMinimumHeight(30);
+        connect(clearButton, &QPushButton::clicked, this, &DataMonitorPage::clearData);
+        ctrlLayout->addWidget(clearButton);
+
+        layout->addLayout(ctrlLayout);
+    }
+
+    void initChart()
+    {
+        chart_ = new QChart;
+        chart_->legend()->setVisible(true);
+        chart_->legend()->setAlignment(Qt::AlignTop);
+        chart_->setBackgroundBrush(Qt::white);
+
+        axisX_ = new QValueAxis;
+        axisY_ = new QValueAxis;
+
+        axisX_->setTitleText("时间 (s)");
+        axisY_->setTitleText("温度 (°C)");
+        axisX_->setRange(0, timeWindowSec_);
+        axisY_->setRange(0, 300);
+
+        chart_->addAxis(axisX_, Qt::AlignBottom);
+        chart_->addAxis(axisY_, Qt::AlignLeft);
+
+        for (int i = 0; i < NUM_CHANNELS; ++i) {
+            auto *series = new QLineSeries;
+            series->setName(channelNames_[i]);
+            QPen pen(channelColors_[i]);
+            pen.setWidth(2);
+            series->setPen(pen);
+
+            chart_->addSeries(series);
+            series->attachAxis(axisX_);
+            series->attachAxis(axisY_);
+            lineSeries_.append(series);
+        }
+
+        chartView_->setChart(chart_);
+        updateThresholdMarkers();
+    }
+
+    void clearThresholdGraphicsOnly()
+    {
+        for (auto *s : thresholdLineSeries_) {
+            chart_->removeSeries(s);
+            delete s;
+        }
+        thresholdLineSeries_.clear();
+    }
+
+    void updateThresholdMarkers()
+    {
+        clearThresholdGraphicsOnly();
+
+        if (thresholdValues_.isEmpty()) return;
+
+        double yMin = axisY_->min();
+        double yMax = axisY_->max();
+
+        for (int i = 0; i <= thresholdValues_.size(); ++i) {
+            double x = i * zoneStepSec_;
+            auto *vSeries = new QLineSeries;
+            QPen pen(Qt::black);
+            pen.setWidth(1);
+            vSeries->setPen(pen);
+            vSeries->append(x, yMin);
+            vSeries->append(x, yMax);
+            chart_->addSeries(vSeries);
+            vSeries->attachAxis(axisX_);
+            vSeries->attachAxis(axisY_);
+            thresholdLineSeries_.append(vSeries);
+        }
+
+        for (int i = 0; i < thresholdValues_.size(); ++i) {
+            double thr = thresholdValues_[i];
+            double x1 = i * zoneStepSec_;
+            double x2 = (i + 1) * zoneStepSec_;
+
+            auto *hSeries = new QLineSeries;
+            QPen pen(QColor("#cc0000"));
+            pen.setWidth(2);
+            pen.setStyle(Qt::DashLine);
+            hSeries->setPen(pen);
+            hSeries->append(x1, thr);
+            hSeries->append(x2, thr);
+            chart_->addSeries(hSeries);
+            hSeries->attachAxis(axisX_);
+            hSeries->attachAxis(axisY_);
+            thresholdLineSeries_.append(hSeries);
+        }
+    }
+
+    void updateAllSeries()
+    {
+        int n = timeData_.size();
+        for (int i = 0; i < NUM_CHANNELS; ++i) {
+            lineSeries_[i]->clear();
+            if (!curveVisible_[i]) continue;
+
+            for (int j = 0; j < n && j < channelData_[i].size(); ++j) {
+                double v = channelData_[i][j];
+                if (!qIsNaN(v)) {
+                    lineSeries_[i]->append(timeData_[j], v);
+                }
+            }
+        }
+    }
+
+    void ensureYRangeForThresholds()
+    {
+        QVector<double> vals;
+        for (const auto &ch : channelData_) {
+            for (double v : ch) {
+                if (!qIsNaN(v)) vals.append(v);
+            }
+        }
+        for (double v : thresholdValues_) vals.append(v);
+
+        if (vals.isEmpty()) return;
+
+        double minV = vals.first();
+        double maxV = vals.first();
+        for (double v : vals) {
+            minV = qMin(minV, v);
+            maxV = qMax(maxV, v);
+        }
+
+        axisY_->setRange(minV - 10, maxV + 15);
+        updateThresholdMarkers();
+    }
+
+public:
+    QVector<double> getTimeData() const { return timeData_; }
+    QVector<QVector<double>> getChannelData() const { return channelData_; }
+    QStringList getChannelNames() const { return channelNames_; }
+
+private:
+    SerialManager *serialManager_;
+
+    QStringList channelNames_;
+    QVector<QColor> channelColors_;
+    QVector<bool> curveVisible_;
+
+    QLabel *statusLabel_ = nullptr;
+    QLabel *batteryLabel_ = nullptr;
+    QPushButton *backButton_ = nullptr;
+    QPushButton *startButton_ = nullptr;
+    QPushButton *stopButton_ = nullptr;
+    QChartView *chartView_ = nullptr;
+    QChart *chart_ = nullptr;
+    QValueAxis *axisX_ = nullptr;
+    QValueAxis *axisY_ = nullptr;
+
+    QVector<QLabel*> valueLabels_;
+    QVector<QLabel*> peakLabels_;
+    QVector<QLabel*> rateLabels_;
+    QVector<QCheckBox*> checkBoxes_;
+    QVector<QLineSeries*> lineSeries_;
+    QVector<QAbstractSeries*> thresholdLineSeries_;
+
+    QVector<double> timeData_;
+    QVector<QVector<double>> channelData_;
+    QVector<double> peakValues_;
+    QVector<double> prevValues_;
+    QVector<double> thresholdValues_;
+
+    qint64 startTimeMs_ = -1;
+    double prevTimeSec_ = qQNaN();
+
+    QTimer *chartRefreshTimer_ = nullptr;
+    bool chartDirty_ = false;
+
+    const int maxPoints_ = 200;
+    const double timeWindowSec_ = 30.0;
+    const int zoneStepSec_ = 10;
+};
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+public:
+    explicit MainWindow(QWidget *parent = nullptr)
+        : QMainWindow(parent)
+    {
+        initUi();
+        setupMenuBar();
+        setupStatusBar();
+        wireSignals();
+    }
+
+protected:
+    void closeEvent(QCloseEvent *event) override
+    {
+        serialManager_.disconnectPort();
+        QMainWindow::closeEvent(event);
+    }
+
+private slots:
+    void switchToConnectionPage()
+    {
+        stackedWidget_->setCurrentWidget(connectionPage_);
+    }
+
+    void switchToMonitorPage()
+    {
+        monitorPage_->setReady();
+        stackedWidget_->setCurrentWidget(monitorPage_);
+    }
+
+    void exportData()
+    {
+        auto timeData = monitorPage_->getTimeData();
+        if (timeData.isEmpty()) {
+            QMessageBox::information(this, "导出数据", "当前没有可导出的数据。");
+            return;
+        }
+
+        QString path = QFileDialog::getSaveFileName(this, "导出数据", "", "CSV 文件 (*.csv);;所有文件 (*)");
+        if (path.isEmpty()) return;
+
+        auto chData = monitorPage_->getChannelData();
+        auto names = monitorPage_->getChannelNames();
+
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, "导出失败", "无法打开导出文件。");
+            return;
+        }
+
+        QTextStream out(&file);
+        out.setCodec("UTF-8");
+        out << "时间(s)";
+        for (const auto &n : names) {
+            out << "," << n << "(°C)";
+        }
+        out << "\n";
+
+        int maxLen = timeData.size();
+        for (int i = 0; i < maxLen; ++i) {
+            out << QString::number(timeData[i], 'f', 3);
+            for (int ch = 0; ch < chData.size(); ++ch) {
+                out << ",";
+                if (i < chData[ch].size() && !qIsNaN(chData[ch][i])) {
+                    out << QString::number(chData[ch][i], 'f', 2);
+                }
+            }
+            out << "\n";
+        }
+        file.close();
+
+        QMessageBox::information(this, "导出成功", QString("数据已导出到：\n%1").arg(path));
+    }
+
+    void showAbout()
+    {
+        QMessageBox::about(this, "关于本软件",
+                           QString("<b>回流焊温度监控软件</b><br>"
+                                   "版本：%1<br><br>"
+                                   "支持串口连接、12路温度监控、12温区阈值显示、CSV 导出。")
+                                   .arg(VERSION));
+    }
+
+    void updateClock()
+    {
+        timeLabel_->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd  HH:mm:ss"));
+    }
+
+    void setStatusMessage(const QString &text)
+    {
+        msgLabel_->setText(text);
+    }
+
+    void setBatteryLevel(int value)
+    {
+        if (value < 0) {
+            batteryStatusLabel_->setText("电量：--");
+            batteryStatusLabel_->setStyleSheet("");
+        } else {
+            batteryStatusLabel_->setText(QString("电量：%1%").arg(value));
+            batteryStatusLabel_->setStyleSheet(value <= 20 ? "color:red;" : "");
+        }
+    }
+
+    void setConnectionStatus(const QString &text, bool connected)
+    {
+        connStatusLabel_->setText(QString("● %1").arg(text));
+        connStatusLabel_->setStyleSheet(connected ? "color:green; font-weight:bold;" : "");
+    }
+
+private:
+    void initUi()
+    {
+        setWindowTitle("回流焊温度监控软件");
+        setGeometry(100, 100, 1300, 900);
+
+        stackedWidget_ = new QStackedWidget(this);
+        connectionPage_ = new ConnectionPage(&serialManager_);
+        monitorPage_ = new DataMonitorPage(&serialManager_);
+
+        stackedWidget_->addWidget(connectionPage_);
+        stackedWidget_->addWidget(monitorPage_);
+        setCentralWidget(stackedWidget_);
+    }
+
+    void wireSignals()
+    {
+        connect(connectionPage_, &ConnectionPage::requestSwitchToMonitorPage, this, &MainWindow::switchToMonitorPage);
+        connect(connectionPage_, &ConnectionPage::requestSetConnectionStatus, this, &MainWindow::setConnectionStatus);
+        connect(connectionPage_, &ConnectionPage::requestSetStatusMessage, this, &MainWindow::setStatusMessage);
+
+        connect(monitorPage_, &DataMonitorPage::requestSetStatusMessage, this, &MainWindow::setStatusMessage);
+        connect(monitorPage_, &DataMonitorPage::requestSetConnectionStatus, this, &MainWindow::setConnectionStatus);
+        connect(monitorPage_, &DataMonitorPage::requestSetBatteryLevel, this, &MainWindow::setBatteryLevel);
+        connect(monitorPage_, &DataMonitorPage::requestSwitchToConnectionPage, this, &MainWindow::switchToConnectionPage);
+    }
+
+    void setupMenuBar()
+    {
+        QMenuBar *mb = menuBar();
+
+        QMenu *fileMenu = mb->addMenu("文件(&F)");
+
+        QAction *actExport = new QAction("导出数据(&E)...", this);
+        actExport->setShortcut(QKeySequence("Ctrl+S"));
+        connect(actExport, &QAction::triggered, this, &MainWindow::exportData);
+        fileMenu->addAction(actExport);
+
+        fileMenu->addSeparator();
+
+        QAction *actQuit = new QAction("退出(&Q)", this);
+        actQuit->setShortcut(QKeySequence("Ctrl+Q"));
+        connect(actQuit, &QAction::triggered, this, &QWidget::close);
+        fileMenu->addAction(actQuit);
+
+        QMenu *viewMenu = mb->addMenu("视图(&V)");
+
+        QAction *actConn = new QAction("连接页面(&C)", this);
+        connect(actConn, &QAction::triggered, this, &MainWindow::switchToConnectionPage);
+        viewMenu->addAction(actConn);
+
+        QAction *actMonitor = new QAction("监控页面(&M)", this);
+        connect(actMonitor, &QAction::triggered, this, &MainWindow::switchToMonitorPage);
+        viewMenu->addAction(actMonitor);
+
+        viewMenu->addSeparator();
+
+        QAction *actFullscreen = new QAction("全屏(&F)", this);
+        actFullscreen->setShortcut(QKeySequence("F11"));
+        actFullscreen->setCheckable(true);
+        connect(actFullscreen, &QAction::toggled, this, [this](bool checked) {
+            if (checked) showFullScreen();
+            else showNormal();
+        });
+        viewMenu->addAction(actFullscreen);
+
+        QMenu *helpMenu = mb->addMenu("关于(&H)");
+
+        QAction *actAbout = new QAction("关于本软件(&A)", this);
+        connect(actAbout, &QAction::triggered, this, &MainWindow::showAbout);
+        helpMenu->addAction(actAbout);
+
+        QAction *actAboutQt = new QAction("关于 Qt(&Q)", this);
+        connect(actAboutQt, &QAction::triggered, this, [this]() {
+            QMessageBox::aboutQt(this, "关于 Qt");
+        });
+        helpMenu->addAction(actAboutQt);
+    }
+
+    void setupStatusBar()
+    {
+        auto *sb = statusBar();
+        sb->setSizeGripEnabled(true);
+
+        msgLabel_ = new QLabel("就绪");
+        sb->addWidget(msgLabel_, 1);
+
+        addSbSep(sb);
+
+        connStatusLabel_ = new QLabel("● 未连接");
+        sb->addPermanentWidget(connStatusLabel_);
+
+        addSbSep(sb);
+
+        batteryStatusLabel_ = new QLabel("电量：--");
+        sb->addPermanentWidget(batteryStatusLabel_);
+
+        addSbSep(sb);
+
+        auto *verLabel = new QLabel(VERSION);
+        sb->addPermanentWidget(verLabel);
+
+        addSbSep(sb);
+
+        timeLabel_ = new QLabel;
+        sb->addPermanentWidget(timeLabel_);
+
+        clockTimer_ = new QTimer(this);
+        connect(clockTimer_, &QTimer::timeout, this, &MainWindow::updateClock);
+        clockTimer_->start(1000);
+        updateClock();
+    }
+
+    static void addSbSep(QStatusBar *sb)
+    {
+        sb->addPermanentWidget(new QLabel("│"));
+    }
+
+private:
+    SerialManager serialManager_;
+
+    QStackedWidget *stackedWidget_ = nullptr;
+    ConnectionPage *connectionPage_ = nullptr;
+    DataMonitorPage *monitorPage_ = nullptr;
+
+    QLabel *msgLabel_ = nullptr;
+    QLabel *connStatusLabel_ = nullptr;
+    QLabel *batteryStatusLabel_ = nullptr;
+    QLabel *timeLabel_ = nullptr;
+    QTimer *clockTimer_ = nullptr;
+};
+
+#include "main.moc"
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+    MainWindow window;
+    window.show();
+    return app.exec();
+}

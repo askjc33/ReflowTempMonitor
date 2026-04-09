@@ -1,0 +1,15 @@
+release/appcontroller.o
+release/boardtracemodel.o
+release/connectionpage.o
+release/main.o
+release/mainwindow.o
+release/serialworker.o
+release/traceabilitypage.o
+release/traceworker.o
+release/moc_appcontroller.o
+release/moc_boardtracemodel.o
+release/moc_connectionpage.o
+release/moc_mainwindow.o
+release/moc_serialworker.o
+release/moc_traceabilitypage.o
+release/moc_traceworker.o

@@ -1,0 +1,15 @@
+debug/appcontroller.o
+debug/boardtracemodel.o
+debug/connectionpage.o
+debug/main.o
+debug/mainwindow.o
+debug/serialworker.o
+debug/traceabilitypage.o
+debug/traceworker.o
+debug/moc_appcontroller.o
+debug/moc_boardtracemodel.o
+debug/moc_connectionpage.o
+debug/moc_mainwindow.o
+debug/moc_serialworker.o
+debug/moc_traceabilitypage.o
+debug/moc_traceworker.o

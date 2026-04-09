@@ -1,0 +1,11 @@
+debug/main.o
+debug/mainwindow.o
+debug/serialworker.o
+debug/pcbdatamanager.o
+debug/temperaturechart.o
+debug/chambervisualizer.o
+debug/moc_mainwindow.o
+debug/moc_serialworker.o
+debug/moc_pcbdatamanager.o
+debug/moc_temperaturechart.o
+debug/moc_chambervisualizer.o

@@ -1,0 +1,11 @@
+release/main.o
+release/mainwindow.o
+release/serialworker.o
+release/pcbdatamanager.o
+release/temperaturechart.o
+release/chambervisualizer.o
+release/moc_mainwindow.o
+release/moc_serialworker.o
+release/moc_pcbdatamanager.o
+release/moc_temperaturechart.o
+release/moc_chambervisualizer.o

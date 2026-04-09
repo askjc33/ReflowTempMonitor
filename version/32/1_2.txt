@@ -1,0 +1,317 @@
+#include "stm32f4xx.h"
+#include "sys.h"
+#include "delay.h"
+#include "usart.h"
+#include "led.h"
+#include "key.h"
+#include <stdio.h>
+#include <string.h>
+
+#define UART3_RX_BUF_SIZE 1024
+#define ZONE_COUNT 12
+#define MAX_BARCODE_LEN 16
+
+uint8_t uart3_rx_buf[UART3_RX_BUF_SIZE];
+uint16_t uart3_rx_len = 0;
+uint8_t uart3_rx_flag = 0;
+
+/* 发送模式
+   0: POS方案动态测试包
+   1: 固定示例包
+*/
+uint8_t g_send_mode = 0;
+
+/* 帧序号 */
+static uint32_t g_seq = 1000;
+
+/* 电量模拟 */
+static uint8_t g_battery = 95;
+
+/* 每个气室当前板号，0表示EMPTY */
+static uint16_t g_zone_board_ids[ZONE_COUNT] = {0};
+
+/* 新板流水号 */
+static uint16_t g_next_board_id = 1;
+
+/* 节拍控制：每N帧进一块新板 */
+static uint8_t g_feed_counter = 0;
+static const uint8_t g_feed_interval = 2;   /* 每2帧进一块板 */
+
+void Delay_ms(uint16_t ms)
+{
+    uint32_t i, j;
+    for(i = 0; i < ms; i++)
+        for(j = 0; j < 1141; j++);
+}
+
+/**
+ * @brief USART3发送1字节
+ */
+void uart3_send_byte(uint8_t data)
+{
+    while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+    USART_SendData(USART3, data);
+}
+
+/**
+ * @brief USART3发送字符串
+ */
+void uart3_send_string(uint8_t *str)
+{
+    while(*str)
+    {
+        uart3_send_byte(*str++);
+    }
+}
+
+/**
+ * @brief USART3初始化
+ */
+void uart3_init(u32 baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3);
+
+    /* PB10 -> TX */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    /* PB11 -> RX */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART3, &USART_InitStructure);
+
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+    USART_Cmd(USART3, ENABLE);
+}
+
+/**
+ * @brief USART3中断
+ */
+void USART3_IRQHandler(void)
+{
+    uint8_t rx_data;
+
+    if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
+    {
+        rx_data = (uint8_t)USART_ReceiveData(USART3);
+
+        if(uart3_rx_len < UART3_RX_BUF_SIZE - 1)
+        {
+            uart3_rx_buf[uart3_rx_len++] = rx_data;
+            uart3_rx_buf[uart3_rx_len] = '\0';
+            uart3_rx_flag = 1;
+        }
+
+        USART_ClearITPendingBit(USART3, USART_IT_RXNE);
+    }
+}
+
+/**
+ * @brief 生成条码字符串，例如 PCB001
+ */
+void make_barcode(uint16_t board_id, char *out)
+{
+    sprintf(out, "PCB%03d", board_id);
+}
+
+/**
+ * @brief 模拟产线推进：所有板向后移动一格，第1区按节拍进新板
+ */
+void simulate_board_movement(void)
+{
+    int i;
+
+    /* 从后往前移动 */
+    for(i = ZONE_COUNT - 1; i > 0; i--)
+    {
+        g_zone_board_ids[i] = g_zone_board_ids[i - 1];
+    }
+
+    /* 按节拍决定第1区是否进板 */
+    g_feed_counter++;
+    if(g_feed_counter >= g_feed_interval)
+    {
+        g_feed_counter = 0;
+        g_zone_board_ids[0] = g_next_board_id++;
+        if(g_next_board_id > 999)
+            g_next_board_id = 1;
+    }
+    else
+    {
+        g_zone_board_ids[0] = 0;
+    }
+}
+
+/**
+ * @brief 根据当前板位置生成温度
+ */
+float make_zone_temp(uint8_t zone_index, uint16_t board_id, uint32_t seq)
+{
+    float base[ZONE_COUNT] = {
+        35.0f, 50.0f, 70.0f, 95.0f, 120.0f, 145.0f,
+        165.0f, 185.0f, 205.0f, 220.0f, 235.0f, 245.0f
+    };
+
+    if(board_id == 0)
+    {
+        /* 空气室温度，也可以发一个较低值 */
+        return base[zone_index] - 10.0f;
+    }
+
+    /* 给不同板一点偏移，再给序号一点抖动 */
+    return base[zone_index]
+           + (board_id % 5) * 1.5f
+           + (seq % 3) * 0.4f;
+}
+
+/**
+ * @brief 发送固定示例包
+ */
+void uart3_send_fixed_packet(void)
+{
+    uart3_send_string((uint8_t *)
+        "TEMP,1001,100.0,101.0,102.0,103.0,104.0,105.0,106.0,107.0,108.0,109.0,110.0,111.0\r\n");
+    uart3_send_string((uint8_t *)
+        "POS,1001,PCB001,PCB002,EMPTY,EMPTY,PCB003,EMPTY,EMPTY,PCB004,EMPTY,EMPTY,EMPTY,EMPTY\r\n");
+    uart3_send_string((uint8_t *)"BATT,88\r\n");
+}
+
+/**
+ * @brief 发送POS方案动态测试包
+ */
+void uart3_send_pos_packet(void)
+{
+    char tx_buf[768];
+    char barcode[MAX_BARCODE_LEN];
+    float temps[ZONE_COUNT];
+    int len = 0;
+    int i;
+
+    simulate_board_movement();
+    g_seq++;
+
+    for(i = 0; i < ZONE_COUNT; i++)
+    {
+        temps[i] = make_zone_temp((uint8_t)i, g_zone_board_ids[i], g_seq);
+    }
+
+    /* TEMP 行 */
+    len += sprintf(&tx_buf[len], "TEMP,%lu", (unsigned long)g_seq);
+    for(i = 0; i < ZONE_COUNT; i++)
+    {
+        len += sprintf(&tx_buf[len], ",%.1f", temps[i]);
+    }
+    len += sprintf(&tx_buf[len], "\r\n");
+
+    /* POS 行 */
+    len += sprintf(&tx_buf[len], "POS,%lu", (unsigned long)g_seq);
+    for(i = 0; i < ZONE_COUNT; i++)
+    {
+        if(g_zone_board_ids[i] == 0)
+        {
+            len += sprintf(&tx_buf[len], ",EMPTY");
+        }
+        else
+        {
+            make_barcode(g_zone_board_ids[i], barcode);
+            len += sprintf(&tx_buf[len], ",%s", barcode);
+        }
+    }
+    len += sprintf(&tx_buf[len], "\r\n");
+
+    /* BATT 行 */
+    len += sprintf(&tx_buf[len], "BATT,%d\r\n", g_battery);
+
+    uart3_send_string((uint8_t *)tx_buf);
+
+    /* USART1调试输出 */
+    printf("SEQ=%lu\r\n", (unsigned long)g_seq);
+    printf("TEMP sent.\r\n");
+    printf("POS : ");
+    for(i = 0; i < ZONE_COUNT; i++)
+    {
+        if(g_zone_board_ids[i] == 0)
+        {
+            printf("EMPTY ");
+        }
+        else
+        {
+            printf("PCB%03d ", g_zone_board_ids[i]);
+        }
+    }
+    printf("\r\n");
+
+    if(g_battery > 5)
+        g_battery--;
+    else
+        g_battery = 95;
+}
+
+int main(void)
+{
+    SysTick_Config(SystemCoreClock / 1000);
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    uart_init(115200);     /* USART1 调试 */
+    uart3_init(115200);    /* USART3 发给Qt */
+    LED_Init();
+    KEY_Init();
+
+    printf("STM32F407 USART3 POS test start.\r\n");
+    printf("Mode 0: POS dynamic packet\r\n");
+    printf("Mode 1: fixed sample packet\r\n");
+
+    while(1)
+    {
+#ifdef KEY0_PRES
+        if(KEY_Scan(0) == KEY0_PRES)
+        {
+            g_send_mode = !g_send_mode;
+            printf("Switch mode = %d\r\n", g_send_mode);
+            Delay_ms(200);
+        }
+#endif
+
+        if(g_send_mode == 1)
+        {
+            uart3_send_fixed_packet();
+            printf("USART3 send fixed sample packet.\r\n");
+        }
+        else
+        {
+            uart3_send_pos_packet();
+        }
+
+        LED1 = LED1;
+
+        /* 测试建议先用 1000~2000ms，别用20秒太慢 */
+        Delay_ms(20000);
+    }
+}

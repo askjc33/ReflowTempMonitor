@@ -1,0 +1,243 @@
+#include "stm32f4xx.h"
+#include "sys.h"
+#include "delay.h"
+#include "usart.h"
+#include "led.h"
+#include "key.h"
+#include <stdio.h>
+#include <string.h>
+
+#define UART3_RX_BUF_SIZE 1024
+
+uint8_t uart3_rx_buf[UART3_RX_BUF_SIZE];
+uint16_t uart3_rx_len = 0;
+uint8_t uart3_rx_flag = 0;
+
+/* 发送模式
+   0: 固定测试包
+   1: 动态温度包
+*/
+/*
+TEMP,1001,100.0,101.0,102.0,103.0,104.0,105.0,106.0,107.0,108.0,109.0,110.0,111.0
+POS,1001,PCB001,PCB002,EMPTY,EMPTY,PCB003,EMPTY,EMPTY,PCB004,EMPTY,EMPTY,EMPTY,EMPTY
+BATT,88
+TEMP,1002,100.5,101.3,102.2,103.1,104.8,105.7,106.6,107.5,108.4,109.3,110.2,111.1
+POS,1002,EMPTY,PCB001,PCB002,EMPTY,EMPTY,PCB003,EMPTY,EMPTY,PCB004,EMPTY,EMPTY,EMPTY
+BATT,87
+*/
+uint8_t g_send_mode = 0;
+
+void Delay_ms(uint16_t ms)
+{
+    uint32_t i, j;
+    for(i = 0; i < ms; i++)
+        for(j = 0; j < 1141; j++);
+}
+
+/**
+ * @brief USART3发送1字节
+ */
+void uart3_send_byte(uint8_t data)
+{
+    while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+    USART_SendData(USART3, data);
+}
+
+/**
+ * @brief USART3发送字符串
+ */
+void uart3_send_string(uint8_t *str)
+{
+    while(*str)
+    {
+        uart3_send_byte(*str++);
+    }
+}
+
+/**
+ * @brief USART3初始化
+ */
+void uart3_init(u32 baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3);
+
+    /* PB10 -> TX */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    /* PB11 -> RX */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART3, &USART_InitStructure);
+
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 3;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+    USART_Cmd(USART3, ENABLE);
+}
+
+/**
+ * @brief USART3中断
+ */
+void USART3_IRQHandler(void)
+{
+    uint8_t rx_data;
+
+    if(USART_GetITStatus(USART3, USART_IT_RXNE) != RESET)
+    {
+        rx_data = (uint8_t)USART_ReceiveData(USART3);
+
+        if(uart3_rx_len < UART3_RX_BUF_SIZE - 1)
+        {
+            uart3_rx_buf[uart3_rx_len++] = rx_data;
+            uart3_rx_buf[uart3_rx_len] = '\0';
+            uart3_rx_flag = 1;
+        }
+
+        USART_ClearITPendingBit(USART3, USART_IT_RXNE);
+    }
+}
+
+/**
+ * @brief 发送固定测试包
+ */
+void uart3_send_fixed_packet(void)
+{
+    uart3_send_string((uint8_t *)"battery:88\r\n");
+    uart3_send_string((uint8_t *)"T1:100.0,T2:110.0,T3:120.0,T4:130.0,T5:140.0,\r\n");
+}
+
+/**
+ * @brief 发送动态测试包
+ */
+void uart3_send_dynamic_packet(float t1, float t2, float t3, float t4, float t5, float t6, float t7, float t8, float t9, float t10, float t11, float t12 ,uint8_t battery)
+{
+    char tx_buf[512];
+
+    sprintf(tx_buf,
+            "battery:%d\r\n"
+            "T1:%.1f,T2:%.1f,T3:%.1f,T4:%.1f,T5:%.1f,T6:%.1f,T7:%.1f,T8:%.1f,T9:%.1f,T10:%.1f,T11:%.1f,T12:%.1f,\r\n",
+            battery, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10,t11,t12);
+
+    uart3_send_string((uint8_t *)tx_buf);
+}
+
+int main(void)
+{
+    float t1 = 25.0f;
+    float t2 = 30.0f;
+    float t3 = 35.0f;
+    float t4 = 40.0f;
+    float t5 = 45.0f;
+	 float t6 = 25.0f;
+    float t7 = 30.0f;
+    float t8 = 35.0f;
+    float t9 = 40.0f;
+    float t10 = 45.0f;
+	 float t11 = 40.0f;
+    float t12 = 45.0f;
+    uint8_t battery = 95;
+
+    SysTick_Config(SystemCoreClock / 1000);
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
+    uart_init(115200);     /* USART1 调试 */
+    uart3_init(115200);    /* USART3 给Qt */
+    LED_Init();
+    KEY_Init();
+
+    printf("STM32F407 USART3 test start.\r\n");
+    printf("Mode 0: fixed packet\r\n");
+    printf("Mode 1: dynamic packet\r\n");
+
+    while(1)
+    {
+        /* 如果你板子的按键函数可用，这里可以切换模式
+           例如：按 KEY0 切换固定/动态模式
+           如果你的 key.h / key.c 定义不同，就把这段先注释掉
+        */
+#ifdef KEY0_PRES
+        if(KEY_Scan(0) == KEY0_PRES)
+        {
+            g_send_mode = !g_send_mode;
+            printf("Switch mode = %d\r\n", g_send_mode);
+            Delay_ms(200);
+        }
+#endif
+
+        if(g_send_mode == 1)
+        {
+            uart3_send_fixed_packet();
+            printf("USART3 send fixed packet.\r\n");
+        }
+        else
+        {
+            uart3_send_dynamic_packet(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12 ,battery);
+            printf("USART3 send dynamic packet: %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f batt=%d\r\n",
+                   t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12 ,battery);
+
+            t1 += 1.0f;
+            t2 += 1.2f;
+            t3 += 1.4f;
+            t4 += 1.6f;
+            t5 += 1.8f;
+					 t6 += 1.0f;
+            t7 += 1.2f;
+            t8 += 1.4f;
+            t9 += 1.6f;
+            t10 += 1.8f;
+					  t11 += 1.6f;
+            t12 += 1.8f;
+
+            if(t1 > 220.0f)
+            {
+                t1 = 25.0f;
+                t2 = 30.0f;
+                t3 = 35.0f;
+                t4 = 40.0f;
+                t5 = 45.0f;
+							  t6 = 25.0f;
+                t7 = 30.0f;
+                t8 = 35.0f;
+                t9 = 40.0f;
+                t10 = 45.0f;
+							  t11 = 25.0f;
+                t12 = 30.0f;
+           
+            }
+
+            if(battery > 5)
+                battery--;
+            else
+                battery = 95;
+        }
+
+        LED1 = LED1;
+        Delay_ms(20000);
+    }
+}

@@ -1,0 +1,11 @@
+debug/main.o
+debug/mainwindow.o
+debug/serialmanager.o
+debug/connectionpage.o
+debug/presetpage.o
+debug/datamonitorpage.o
+debug/moc_mainwindow.o
+debug/moc_serialmanager.o
+debug/moc_connectionpage.o
+debug/moc_presetpage.o
+debug/moc_datamonitorpage.o

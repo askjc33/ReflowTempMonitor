@@ -1,0 +1,11 @@
+debug/board_trace_manager.o
+debug/connection_page.o
+debug/main.o
+debug/main_window.o
+debug/serial_manager.o
+debug/traceability_page.o
+debug/moc_board_trace_manager.o
+debug/moc_connection_page.o
+debug/moc_main_window.o
+debug/moc_serial_manager.o
+debug/moc_traceability_page.o
