@@ -89,6 +89,7 @@ void TraceabilityPage::refreshView()
 
             table_->setItem(row, 5, new QTableWidgetItem(
                 r.lastZone > 0 ? QString::number(r.lastZone) : "-"));
+            table_->setItem(row, 6, new QTableWidgetItem(buildAlarmText(r)));
 
             if (selectedBarcodes_.contains(r.barcode)) {
                 table_->selectRow(row);
@@ -170,21 +171,14 @@ void TraceabilityPage::clearFinishedRecords()
 void TraceabilityPage::exportCurrentBoard()
 {
     if (selectedBarcodes_.isEmpty()) {
-        QMessageBox::information(this, QString::fromUtf8("导出"), QString::fromUtf8("请先选择一块PCBA记录。"));
-        return;
-    }
-
-    QString barcode = *selectedBarcodes_.begin();
-    BoardRecord r;
-    if (!manager_->getRecordByBarcode(barcode, r)) {
-        QMessageBox::warning(this, QString::fromUtf8("导出"), QString::fromUtf8("未找到记录。"));
+        QMessageBox::information(this, QString::fromUtf8("导出"), QString::fromUtf8("请先选择至少一块PCBA记录。"));
         return;
     }
 
     QString path = QFileDialog::getSaveFileName(
         this,
         QString::fromUtf8("导出CSV"),
-        QString("%1.csv").arg(r.barcode),
+        QString::fromUtf8("selected_boards.csv"),
         QString::fromUtf8("CSV 文件 (*.csv)")
     );
     if (path.isEmpty()) return;
@@ -197,20 +191,42 @@ void TraceabilityPage::exportCurrentBoard()
 
     QTextStream out(&file);
     out.setCodec("UTF-8");
-    out << "Barcode," << r.barcode << "\n";
-    out << "EnterTime," << (r.enterTime.isValid() ? r.enterTime.toString(Qt::ISODate) : "") << "\n";
-    out << "ExitTime," << (r.exitTime.isValid() ? r.exitTime.toString(Qt::ISODate) : "") << "\n";
-    out << "Status," << r.status << "\n\n";
-    out << "ElapsedSec,Temp,Zone\n";
 
-    int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
-    for (int i = 0; i < n; ++i) {
-        out << QString::number(r.timeAxis.at(i), 'f', 3) << ","
-            << QString::number(r.fullTemps.at(i), 'f', 2) << ","
-            << r.zoneAxis.at(i) << "\n";
+    bool exportedAny = false;
+    for (const QString &barcode : selectedBarcodes_) {
+        BoardRecord r;
+        if (!manager_->getRecordByBarcode(barcode, r)) {
+            continue;
+        }
+
+        if (exportedAny) {
+            out << "\n";
+        }
+
+        out << "Barcode," << r.barcode << "\n";
+        out << "EnterTime," << (r.enterTime.isValid() ? r.enterTime.toString(Qt::ISODate) : "") << "\n";
+        out << "ExitTime," << (r.exitTime.isValid() ? r.exitTime.toString(Qt::ISODate) : "") << "\n";
+        out << "Status," << r.status << "\n";
+        out << "Alarm," << buildAlarmText(r) << "\n\n";
+        out << "ElapsedSec,Temp,Zone\n";
+
+        int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
+        for (int i = 0; i < n; ++i) {
+            out << QString::number(r.timeAxis.at(i), 'f', 3) << ","
+                << QString::number(r.fullTemps.at(i), 'f', 2) << ","
+                << r.zoneAxis.at(i) << "\n";
+        }
+
+        exportedAny = true;
     }
 
     file.close();
+
+    if (!exportedAny) {
+        QMessageBox::warning(this, QString::fromUtf8("导出失败"), QString::fromUtf8("未找到可导出的记录。"));
+        return;
+    }
+
     QMessageBox::information(this, QString::fromUtf8("导出成功"), path);
 }
 
@@ -296,14 +312,15 @@ void TraceabilityPage::initUi()
     QGroupBox *tableGroup = new QGroupBox(QString::fromUtf8("过炉记录列表"));
     QVBoxLayout *tableLayout = new QVBoxLayout(tableGroup);
     table_ = new QTableWidget;
-    table_->setColumnCount(6);
+    table_->setColumnCount(7);
     table_->setHorizontalHeaderLabels(
         QStringList() << QString::fromUtf8("条码")
         << QString::fromUtf8("进板时间")
         << QString::fromUtf8("出板时间")
         << QString::fromUtf8("状态")
         << QString::fromUtf8("时长(s)")
-        << QString::fromUtf8("最后气室"));
+        << QString::fromUtf8("最后气室")
+        << QString::fromUtf8("报警信息"));
 
     table_->horizontalHeader()->setStretchLastSection(true);
     table_->setColumnWidth(0, 140);
@@ -311,6 +328,8 @@ void TraceabilityPage::initUi()
     table_->setColumnWidth(2, 180);
     table_->setColumnWidth(3, 90);
     table_->setColumnWidth(4, 90);
+    table_->setColumnWidth(5, 90);
+    table_->setColumnWidth(6, 180);
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setAlternatingRowColors(true);
@@ -324,7 +343,7 @@ void TraceabilityPage::initUi()
 void TraceabilityPage::initChart()
 {
     chart_ = new QtCharts::QChart;
-    chart_->legend()->setVisible(true);
+    chart_->legend()->setVisible(false);
     chart_->legend()->setAlignment(Qt::AlignTop);
     chart_->setTitle(QString::fromUtf8("多板温度曲线对比"));
 
@@ -427,6 +446,28 @@ void TraceabilityPage::clearReferenceLineList(QList<QtCharts::QLineSeries*> &lin
         delete lines.at(i);
     }
     lines.clear();
+}
+
+QString TraceabilityPage::buildAlarmText(const BoardRecord &record) const
+{
+    const QVector<double> thresholds = settings_->zoneThresholds();
+    QStringList exceededZones;
+
+    for (int zone = 0; zone < record.zoneTemps.size() && zone < thresholds.size(); ++zone) {
+        const QVector<double> &temps = record.zoneTemps.at(zone);
+        for (int i = 0; i < temps.size(); ++i) {
+            if (temps.at(i) > thresholds.at(zone)) {
+                exceededZones.append(QString::fromUtf8("%1区").arg(zone + 1));
+                break;
+            }
+        }
+    }
+
+    if (exceededZones.isEmpty()) {
+        return QString::fromUtf8("正常");
+    }
+
+    return QString::fromUtf8("报警（%1 超阈值）").arg(exceededZones.join(QString::fromUtf8("、")));
 }
 
 QColor TraceabilityPage::getNextLineColor()
