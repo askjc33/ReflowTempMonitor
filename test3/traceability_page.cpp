@@ -1,4 +1,6 @@
 #include "traceability_page.h"
+#include "serial_manager.h"
+#include "board_trace_manager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -19,24 +21,30 @@
 #include <QSignalBlocker>
 #include <QPainter>
 #include <algorithm>
+#include <QSet>
+#include <QColor>
+#include <QtCharts/QLineSeries>
+#include <QtCharts/QValueAxis>
+#include <QtCharts/QChart>
+#include <QtCharts/QChartView>
+#include <QPen>
 
 TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, QWidget *parent)
     : QWidget(parent),
       serial_(serial),
       manager_(manager),
-      batteryLabel_(0),
-      barcodeValue_(0),
-      statusValue_(0),
-      enterValue_(0),
-      exitValue_(0),
-      durationValue_(0),
-      zoneValue_(0),
-      chartView_(0),
-      chart_(0),
-      series_(0),
-      axisX_(0),
-      axisY_(0),
-      table_(0)
+      batteryLabel_(nullptr),
+      barcodeValue_(nullptr),
+      statusValue_(nullptr),
+      enterValue_(nullptr),
+      exitValue_(nullptr),
+      durationValue_(nullptr),
+      zoneValue_(nullptr),
+      chartView_(nullptr),
+      chart_(nullptr),
+      axisX_(nullptr),
+      axisY_(nullptr),
+      table_(nullptr)
 {
     connect(manager_, SIGNAL(recordsUpdated()), this, SLOT(refreshView()));
     connect(serial_, SIGNAL(batteryReceived(int)), this, SLOT(onBatteryReceived(int)));
@@ -51,9 +59,9 @@ void TraceabilityPage::refreshView()
 {
     QList<BoardRecord> records = manager_->allRecords();
 
-    table_->setUpdatesEnabled(false);           //减少刷新闪烁和重绘次数
+    table_->setUpdatesEnabled(false);
     {
-        QSignalBlocker blocker(table_);         //重新填表时，可能触发表格自己的信号。刷新时暂时屏蔽信号
+        QSignalBlocker blocker(table_);
         table_->clearContents();
         table_->setRowCount(records.size());
 
@@ -66,10 +74,8 @@ void TraceabilityPage::refreshView()
 
             table_->setItem(row, 1, new QTableWidgetItem(
                 r.enterTime.isValid() ? r.enterTime.toString("yyyy-MM-dd HH:mm:ss") : "-"));
-
             table_->setItem(row, 2, new QTableWidgetItem(
                 r.exitTime.isValid() ? r.exitTime.toString("yyyy-MM-dd HH:mm:ss") : "-"));
-
             table_->setItem(row, 3, new QTableWidgetItem(r.status));
 
             double duration = r.timeAxis.isEmpty() ? 0.0 : r.timeAxis.last();
@@ -77,31 +83,42 @@ void TraceabilityPage::refreshView()
 
             table_->setItem(row, 5, new QTableWidgetItem(
                 r.lastZone > 0 ? QString::number(r.lastZone) : "-"));
+
+            if (selectedBarcodes_.contains(r.barcode)) {
+                table_->selectRow(row);
+            }
         }
     }
     table_->setUpdatesEnabled(true);
     table_->viewport()->update();
 
-    if (!selectedBarcode_.isEmpty()) {
-        showBoard(selectedBarcode_);
-        reselectRowByBarcode(selectedBarcode_);
-    } else if (!records.isEmpty()) {
-        selectedBarcode_ = records.first().barcode;
-        showBoard(selectedBarcode_);
-        reselectRowByBarcode(selectedBarcode_);
-    } else {
-        clearBoardDisplay();
+    for (const QString &code : selectedBarcodes_) {
+        showBoard(code);
     }
+
+    refreshSelectedBoardInfo();
 }
 
 void TraceabilityPage::onTableCellClicked(int row, int)
 {
     QTableWidgetItem *item = table_->item(row, 0);
-    if (!item) {
-        return;
+    if (!item) return;
+
+    QString barcode = item->data(Qt::UserRole).toString();
+
+    if (selectedBarcodes_.contains(barcode)) {
+        selectedBarcodes_.remove(barcode);
+        if (multiSeries_.contains(barcode)) {
+            chart_->removeSeries(multiSeries_.take(barcode));
+        }
+        emit requestSetStatusMessage(QString::fromUtf8("已隐藏：%1").arg(barcode));
+    } else {
+        selectedBarcodes_.insert(barcode);
+        showBoard(barcode);
+        emit requestSetStatusMessage(QString::fromUtf8("已显示：%1").arg(barcode));
     }
-    selectedBarcode_ = item->data(Qt::UserRole).toString();
-    showBoard(selectedBarcode_);
+
+    refreshSelectedBoardInfo();
 }
 
 void TraceabilityPage::onBatteryReceived(int value)
@@ -126,7 +143,7 @@ void TraceabilityPage::onDisconnected()
     emit requestSetConnectionStatus(QString::fromUtf8("未连接"), false);
     emit requestSetBatteryLevel(-1);
 
-    selectedBarcode_.clear();
+    selectedBarcodes_.clear();
     clearBoardDisplay();
     table_->clearContents();
     table_->setRowCount(0);
@@ -140,44 +157,42 @@ void TraceabilityPage::clearFinishedRecords()
     emit requestSetStatusMessage(QString::fromUtf8("已清空完成记录"));
 }
 
-void TraceabilityPage::exportCurrentBoard()     //负责把当前选中板导出成 CSV
+void TraceabilityPage::exportCurrentBoard()
 {
-    if (selectedBarcode_.isEmpty()) {
+    if (selectedBarcodes_.isEmpty()) {
         QMessageBox::information(this, QString::fromUtf8("导出"), QString::fromUtf8("请先选择一块PCBA记录。"));
         return;
     }
 
+    QString barcode = *selectedBarcodes_.begin();
     BoardRecord r;
-    if (!manager_->getRecordByBarcode(selectedBarcode_, r)) {
-        QMessageBox::warning(this, QString::fromUtf8("导出"), QString::fromUtf8("未找到当前板记录。"));
+    if (!manager_->getRecordByBarcode(barcode, r)) {
+        QMessageBox::warning(this, QString::fromUtf8("导出"), QString::fromUtf8("未找到记录。"));
         return;
     }
 
     QString path = QFileDialog::getSaveFileName(
         this,
-        QString::fromUtf8("导出当前板CSV"),
+        QString::fromUtf8("导出CSV"),
         QString("%1.csv").arg(r.barcode),
         QString::fromUtf8("CSV 文件 (*.csv)")
     );
-    if (path.isEmpty()) {
-        return;
-    }
+    if (path.isEmpty()) return;
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, QString::fromUtf8("导出失败"), QString::fromUtf8("无法写入文件。"));
+        QMessageBox::warning(this, QString::fromUtf8("导出失败"), QString::fromUtf8("无法写入文件"));
         return;
     }
 
     QTextStream out(&file);
     out.setCodec("UTF-8");
-
     out << "Barcode," << r.barcode << "\n";
     out << "EnterTime," << (r.enterTime.isValid() ? r.enterTime.toString(Qt::ISODate) : "") << "\n";
     out << "ExitTime," << (r.exitTime.isValid() ? r.exitTime.toString(Qt::ISODate) : "") << "\n";
     out << "Status," << r.status << "\n\n";
-
     out << "ElapsedSec,Temp,Zone\n";
+
     int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
     for (int i = 0; i < n; ++i) {
         out << QString::number(r.timeAxis.at(i), 'f', 3) << ","
@@ -186,8 +201,7 @@ void TraceabilityPage::exportCurrentBoard()     //负责把当前选中板导出
     }
 
     file.close();
-    QMessageBox::information(this, QString::fromUtf8("导出成功"),
-                             QString::fromUtf8("已导出到：\n%1").arg(path));
+    QMessageBox::information(this, QString::fromUtf8("导出成功"), path);
 }
 
 void TraceabilityPage::initUi()
@@ -195,14 +209,12 @@ void TraceabilityPage::initUi()
     QVBoxLayout *layout = new QVBoxLayout(this);
 
     QHBoxLayout *top = new QHBoxLayout;
-
-    QLabel *title = new QLabel(QString::fromUtf8("PCBA 过炉追溯"));
+    QLabel *title = new QLabel(QString::fromUtf8("PCBA 过炉追溯（多板对比）"));
     QFont titleFont;
     titleFont.setPointSize(12);
     titleFont.setBold(true);
     title->setFont(titleFont);
     top->addWidget(title);
-
     top->addStretch();
 
     batteryLabel_ = new QLabel(QString::fromUtf8("电量：--"));
@@ -252,24 +264,20 @@ void TraceabilityPage::initUi()
 
     layout->addWidget(infoGroup);
 
-    QGroupBox *chartGroup = new QGroupBox(QString::fromUtf8("温度曲线"));
+    QGroupBox *chartGroup = new QGroupBox(QString::fromUtf8("温度曲线对比"));
     QVBoxLayout *chartLayout = new QVBoxLayout(chartGroup);
-
-    chartView_ = new QChartView;
+    chartView_ = new QtCharts::QChartView;
     chartView_->setRenderHint(QPainter::Antialiasing);
     chartView_->setMinimumHeight(420);
     chartLayout->addWidget(chartView_);
-
     layout->addWidget(chartGroup, 1);
 
     QGroupBox *tableGroup = new QGroupBox(QString::fromUtf8("过炉记录列表"));
     QVBoxLayout *tableLayout = new QVBoxLayout(tableGroup);
-
     table_ = new QTableWidget;
     table_->setColumnCount(6);
     table_->setHorizontalHeaderLabels(
-        QStringList()
-        << QString::fromUtf8("条码")
+        QStringList() << QString::fromUtf8("条码")
         << QString::fromUtf8("进板时间")
         << QString::fromUtf8("出板时间")
         << QString::fromUtf8("状态")
@@ -282,11 +290,10 @@ void TraceabilityPage::initUi()
     table_->setColumnWidth(2, 180);
     table_->setColumnWidth(3, 90);
     table_->setColumnWidth(4, 90);
-
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setAlternatingRowColors(true);
-    table_->setSelectionMode(QAbstractItemView::SingleSelection);
+    table_->setSelectionMode(QAbstractItemView::MultiSelection);
     connect(table_, SIGNAL(cellClicked(int,int)), this, SLOT(onTableCellClicked(int,int)));
 
     tableLayout->addWidget(table_);
@@ -295,30 +302,22 @@ void TraceabilityPage::initUi()
 
 void TraceabilityPage::initChart()
 {
-    chart_ = new QChart;    //图表容器
-    chart_->legend()->setVisible(false);
-    chart_->setTitle(QString::fromUtf8("选中 PCBA 的完整过炉温度曲线"));
+    chart_ = new QtCharts::QChart;
+    chart_->legend()->setVisible(true);
+    chart_->legend()->setAlignment(Qt::AlignTop);
+    chart_->setTitle(QString::fromUtf8("多板温度曲线对比"));
 
-    series_ = new QLineSeries;      //一条折线
-    QPen pen(QColor("#d32f2f"));
-    pen.setWidth(2);
-    series_->setPen(pen);
-
-    chart_->addSeries(series_);
-
-    //坐标轴
-    axisX_ = new QValueAxis;
-    axisY_ = new QValueAxis;
-
+    axisX_ = new QtCharts::QValueAxis;
+    axisY_ = new QtCharts::QValueAxis;
     axisX_->setTitleText(QString::fromUtf8("过炉时间 (s)"));
     axisY_->setTitleText(QString::fromUtf8("温度 (°C)"));
-    axisX_->setRange(0, totalProcessTimeSec_);
-    axisY_->setRange(0, 260);
+
+    // 永久固定坐标轴
+    axisX_->setRange(0, 180.0);
+    axisY_->setRange(0, 300.0);
 
     chart_->addAxis(axisX_, Qt::AlignBottom);
     chart_->addAxis(axisY_, Qt::AlignLeft);
-    series_->attachAxis(axisX_);
-    series_->attachAxis(axisY_);
 
     addZoneReferenceLines();
     chartView_->setChart(chart_);
@@ -326,19 +325,16 @@ void TraceabilityPage::initChart()
 
 void TraceabilityPage::addZoneReferenceLines()
 {
-    double step = totalProcessTimeSec_ / double(ZONE_COUNT);
-
+    double step = 180.0 / (double)ZONE_COUNT;
     for (int i = 0; i <= ZONE_COUNT; ++i) {
-        QLineSeries *line = new QLineSeries;
+        QtCharts::QLineSeries *line = new QtCharts::QLineSeries;
         QPen pen(QColor("#888888"));
         pen.setStyle(Qt::DashLine);
         pen.setWidth(1);
         line->setPen(pen);
-
         double x = i * step;
         line->append(x, 0);
-        line->append(x, 260);
-
+        line->append(x, 300);
         chart_->addSeries(line);
         line->attachAxis(axisX_);
         line->attachAxis(axisY_);
@@ -346,65 +342,94 @@ void TraceabilityPage::addZoneReferenceLines()
     }
 }
 
-void TraceabilityPage::showBoard(const QString &barcode)    //从 BoardTraceManager 拿到这块板完整记录，然后更新
+QColor TraceabilityPage::getNextLineColor()
+{
+    QList<QColor> colors = {
+        QColor(211,47,47),
+        QColor(25,118,210),
+        QColor(56,142,60),
+        QColor(245,124,0),
+        QColor(123,31,162),
+        QColor(0,121,107),
+        QColor(194,24,91),
+        QColor(251,192,45)
+    };
+
+    for (const QColor &c : colors) {
+        bool used = false;
+        for (auto s : multiSeries_) {
+            if (s->pen().color() == c) {
+                used = true;
+                break;
+            }
+        }
+        if (!used) return c;
+    }
+    return colors.first();
+}
+
+void TraceabilityPage::showBoard(const QString &barcode)
 {
     BoardRecord r;
-    if (!manager_->getRecordByBarcode(barcode, r)) {
+    if (!manager_->getRecordByBarcode(barcode, r)) return;
+
+    QVector<QPointF> pts;
+    int n = qMin(r.timeAxis.size(), r.fullTemps.size());
+    for (int i = 0; i < n; ++i) {
+        pts.append({r.timeAxis[i], r.fullTemps[i]});
+    }
+
+    QtCharts::QLineSeries *series = nullptr;
+    if (multiSeries_.contains(barcode)) {
+        series = multiSeries_[barcode];
+        series->replace(pts);
+    } else {
+        series = new QtCharts::QLineSeries;
+        QColor color = getNextLineColor();
+        QPen pen(color);
+        pen.setWidth(2);
+        series->setPen(pen);
+        series->setName(barcode);
+        chart_->addSeries(series);
+        series->attachAxis(axisX_);
+        series->attachAxis(axisY_);
+        multiSeries_[barcode] = series;
+        series->replace(pts);
+    }
+}
+
+void TraceabilityPage::refreshSelectedBoardInfo()
+{
+    if (selectedBarcodes_.isEmpty()) {
         clearBoardDisplay();
         return;
     }
 
-    barcodeValue_->setText(r.barcode);
+    QString last = *selectedBarcodes_.begin();
+    BoardRecord r;
+    if (!manager_->getRecordByBarcode(last, r)) {
+        clearBoardDisplay();
+        return;
+    }
+
+    barcodeValue_->setText(QString("%1（已选%2块）").arg(last).arg(selectedBarcodes_.size()));
     statusValue_->setText(r.status);
     enterValue_->setText(r.enterTime.isValid() ? r.enterTime.toString("yyyy-MM-dd HH:mm:ss") : "--");
     exitValue_->setText(r.exitTime.isValid() ? r.exitTime.toString("yyyy-MM-dd HH:mm:ss") : "--");
     durationValue_->setText(r.timeAxis.isEmpty() ? "--" : QString("%1 s").arg(r.timeAxis.last(), 0, 'f', 1));
     zoneValue_->setText(r.lastZone > 0 ? QString::number(r.lastZone) : "--");
-
-    QVector<QPointF> points;
-    int n = qMin(r.timeAxis.size(), r.fullTemps.size());
-    points.reserve(n);
-    for (int i = 0; i < n; ++i) {
-        points.append(QPointF(r.timeAxis.at(i), r.fullTemps.at(i)));
-    }
-
-    series_->replace(points);
-
-    double xMax = totalProcessTimeSec_;
-    if (!r.timeAxis.isEmpty()) {
-        xMax = qMax(totalProcessTimeSec_, r.timeAxis.last() + 5.0);
-    }
-    axisX_->setRange(0, xMax);
-
-    emit requestSetStatusMessage(QString::fromUtf8("已显示板 %1 的温度曲线").arg(r.barcode));
 }
 
 void TraceabilityPage::clearBoardDisplay()
 {
+    for (auto s : multiSeries_) chart_->removeSeries(s);
+    qDeleteAll(multiSeries_);
+    multiSeries_.clear();
+
     barcodeValue_->setText("--");
     statusValue_->setText("--");
     enterValue_->setText("--");
     exitValue_->setText("--");
     durationValue_->setText("--");
     zoneValue_->setText("--");
-
-    if (series_) {
-        QVector<QPointF> empty;
-        series_->replace(empty);
-    }
-
-    if (axisX_) {
-        axisX_->setRange(0, totalProcessTimeSec_);
-    }
-}
-
-void TraceabilityPage::reselectRowByBarcode(const QString &barcode)
-{
-    for (int row = 0; row < table_->rowCount(); ++row) {
-        QTableWidgetItem *item = table_->item(row, 0);
-        if (item && item->data(Qt::UserRole).toString() == barcode) {
-            table_->selectRow(row);
-            return;
-        }
-    }
 }

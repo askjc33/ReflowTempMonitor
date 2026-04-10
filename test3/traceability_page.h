@@ -1,35 +1,37 @@
-#pragma once
+#ifndef TRACEABILITY_PAGE_H
+#define TRACEABILITY_PAGE_H
 
 #include <QWidget>
-#include <QVector>
+#include <QSet>
+#include <QMap>
+#include <QColor>
+#include <QTableWidget>
+#include <QLabel>
 #include <QtCharts/QChartView>
 #include <QtCharts/QChart>
-#include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>
+#include <QtCharts/QLineSeries>
 
-QT_CHARTS_USE_NAMESPACE
-
-class QLabel;
-class QTableWidget;
-
-#include "serial_manager.h"
-#include "board_trace_manager.h"
+class SerialManager;
+class BoardTraceManager;
+struct BoardRecord;
 
 class TraceabilityPage : public QWidget
 {
     Q_OBJECT
+
 public:
-    explicit TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, QWidget *parent = 0);
+    explicit TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, QWidget *parent = nullptr);
 
 signals:
-    void requestDisconnectAndBack();
     void requestSetStatusMessage(const QString &text);
     void requestSetConnectionStatus(const QString &text, bool connected);
     void requestSetBatteryLevel(int value);
+    void requestDisconnectAndBack();
 
 private slots:
-    void refreshView();    //表格刷新
-    void onTableCellClicked(int row, int column);
+    void refreshView();
+    void onTableCellClicked(int row, int);
     void onBatteryReceived(int value);
     void disconnectDevice();
     void onSerialError(const QString &msg);
@@ -41,12 +43,11 @@ private:
     void initUi();
     void initChart();
     void addZoneReferenceLines();
+    QColor getNextLineColor();
     void showBoard(const QString &barcode);
-    //void showBoards(const QString &barcodes);
+    void refreshSelectedBoardInfo();
     void clearBoardDisplay();
-    void reselectRowByBarcode(const QString &barcode);
 
-private:
     SerialManager *serial_;
     BoardTraceManager *manager_;
 
@@ -58,25 +59,16 @@ private:
     QLabel *durationValue_;
     QLabel *zoneValue_;
 
-    QChartView *chartView_;
-    QChart *chart_;
-    QLineSeries *series_;
-
-//    // 新增多板对比
-//    QMap<QString, QLineSeries*> boardSeriesMap_; // 板码 -> 折线
-//    QVector<QColor> seriesColors_ = {
-//        Qt::red, Qt::blue, Qt::green, Qt::magenta,
-//        Qt::cyan, Qt::yellow, Qt::gray, Qt::darkRed,
-//        Qt::darkBlue, Qt::darkGreen, Qt::darkMagenta
-//    };
-//    int colorIndex_ = 0; // 用于循环选择颜色
-
-    QValueAxis *axisX_;
-    QValueAxis *axisY_;
-    QVector<QLineSeries*> zoneRefLines_;
+    QtCharts::QChartView *chartView_;
+    QtCharts::QChart *chart_;
+    QtCharts::QValueAxis *axisX_;
+    QtCharts::QValueAxis *axisY_;
+    QList<QtCharts::QLineSeries*> zoneRefLines_;
 
     QTableWidget *table_;
-    QString selectedBarcode_;
 
-    const double totalProcessTimeSec_ = 120.0;
+    QSet<QString> selectedBarcodes_;
+    QMap<QString, QtCharts::QLineSeries*> multiSeries_;
 };
+
+#endif // TRACEABILITY_PAGE_H
