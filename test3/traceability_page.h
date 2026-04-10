@@ -56,6 +56,7 @@ private:
     void updateAxisRange();
     void rebuildReferenceLines();
     void clearReferenceLineList(QList<QtCharts::QLineSeries*> &lines);
+    QString buildAlarmText(const BoardRecord &record) const;
     QColor getNextLineColor();
     void showBoard(const QString &barcode);
     void refreshSelectedBoardInfo();
