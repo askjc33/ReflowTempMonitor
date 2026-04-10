@@ -1,6 +1,7 @@
 #include "traceability_page.h"
 #include "serial_manager.h"
 #include "board_trace_manager.h"
+#include "reflow_settings.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -28,11 +29,13 @@
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QPen>
+#include <QtMath>
 
-TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, QWidget *parent)
+TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, ReflowSettings *settings, QWidget *parent)
     : QWidget(parent),
       serial_(serial),
       manager_(manager),
+      settings_(settings),
       batteryLabel_(nullptr),
       barcodeValue_(nullptr),
       statusValue_(nullptr),
@@ -50,6 +53,9 @@ TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *man
     connect(serial_, SIGNAL(batteryReceived(int)), this, SLOT(onBatteryReceived(int)));
     connect(serial_, SIGNAL(notifyError(QString)), this, SLOT(onSerialError(QString)));
     connect(serial_, SIGNAL(disconnected()), this, SLOT(onDisconnected()));
+
+    // ===== 新增：温区设置变化时刷新曲线参考线 =====
+    connect(settings_, SIGNAL(settingsChanged()), this, SLOT(refreshChartReferences()));
 
     initUi();
     initChart();
@@ -96,6 +102,7 @@ void TraceabilityPage::refreshView()
         showBoard(code);
     }
 
+    updateAxisRange();
     refreshSelectedBoardInfo();
 }
 
@@ -109,7 +116,9 @@ void TraceabilityPage::onTableCellClicked(int row, int)
     if (selectedBarcodes_.contains(barcode)) {
         selectedBarcodes_.remove(barcode);
         if (multiSeries_.contains(barcode)) {
-            chart_->removeSeries(multiSeries_.take(barcode));
+            QtCharts::QLineSeries *series = multiSeries_.take(barcode);
+            chart_->removeSeries(series);
+            delete series;
         }
         emit requestSetStatusMessage(QString::fromUtf8("已隐藏：%1").arg(barcode));
     } else {
@@ -118,6 +127,7 @@ void TraceabilityPage::onTableCellClicked(int row, int)
         emit requestSetStatusMessage(QString::fromUtf8("已显示：%1").arg(barcode));
     }
 
+    updateAxisRange();
     refreshSelectedBoardInfo();
 }
 
@@ -202,6 +212,17 @@ void TraceabilityPage::exportCurrentBoard()
 
     file.close();
     QMessageBox::information(this, QString::fromUtf8("导出成功"), path);
+}
+
+void TraceabilityPage::refreshChartReferences()
+{
+    // ===== 新增：重建温区竖线、阈值横线、横坐标范围 =====
+    rebuildReferenceLines();
+    updateAxisRange();
+
+    for (const QString &code : selectedBarcodes_) {
+        showBoard(code);
+    }
 }
 
 void TraceabilityPage::initUi()
@@ -312,34 +333,100 @@ void TraceabilityPage::initChart()
     axisX_->setTitleText(QString::fromUtf8("过炉时间 (s)"));
     axisY_->setTitleText(QString::fromUtf8("温度 (°C)"));
 
-    // 永久固定坐标轴
-    axisX_->setRange(0, 180.0);
-    axisY_->setRange(0, 300.0);
+    // ===== 新增：横坐标细分显示，50s 一个主数字，5s 细刻度 =====
+    axisX_->setLabelFormat("%.0f");
+    axisX_->setTickType(QtCharts::QValueAxis::TicksDynamic);
+    axisX_->setTickAnchor(0.0);
+    axisX_->setTickInterval(50.0);
+    axisX_->setMinorTickCount(9);
+    axisY_->setRange(0.0, 300.0);
+    axisY_->setTickCount(7);
 
     chart_->addAxis(axisX_, Qt::AlignBottom);
     chart_->addAxis(axisY_, Qt::AlignLeft);
 
-    addZoneReferenceLines();
+    rebuildReferenceLines();
+    updateAxisRange();
     chartView_->setChart(chart_);
 }
 
-void TraceabilityPage::addZoneReferenceLines()
+void TraceabilityPage::updateAxisRange()
 {
-    double step = 180.0 / (double)ZONE_COUNT;
-    for (int i = 0; i <= ZONE_COUNT; ++i) {
-        QtCharts::QLineSeries *line = new QtCharts::QLineSeries;
-        QPen pen(QColor("#888888"));
-        pen.setStyle(Qt::DashLine);
-        pen.setWidth(1);
-        line->setPen(pen);
-        double x = i * step;
-        line->append(x, 0);
-        line->append(x, 300);
-        chart_->addSeries(line);
-        line->attachAxis(axisX_);
-        line->attachAxis(axisY_);
-        zoneRefLines_.append(line);
+    // ===== 新增：横坐标至少显示到 250s，并按 50s 向上取整 =====
+    double axisMax = qMax(250.0, settings_->totalDuration());
+    for (auto it = multiSeries_.constBegin(); it != multiSeries_.constEnd(); ++it) {
+        const QList<QPointF> points = it.value()->points();
+        if (!points.isEmpty()) {
+            axisMax = qMax(axisMax, points.last().x());
+        }
     }
+
+    axisX_->setRange(0.0, qMax(250.0, qCeil(axisMax / 50.0) * 50.0));
+}
+
+void TraceabilityPage::rebuildReferenceLines()
+{
+    // ===== 新增：根据 12 个温区长度与阈值重建参考线 =====
+    clearReferenceLineList(zoneRefLines_);
+    clearReferenceLineList(thresholdRefLines_);
+
+    const QVector<double> lengths = settings_->zoneLengths();
+    const QVector<double> thresholds = settings_->zoneThresholds();
+    double x = 0.0;
+
+    for (int i = 0; i < lengths.size(); ++i) {
+        QtCharts::QLineSeries *zoneLine = new QtCharts::QLineSeries;
+        // ===== 新增：温区分隔竖线 =====
+        QPen zonePen(QColor("#777777"));
+        zonePen.setStyle(Qt::DashLine);
+        zonePen.setWidth(1);
+        zoneLine->setPen(zonePen);
+        zoneLine->append(x, 0.0);
+        zoneLine->append(x, 300.0);
+        chart_->addSeries(zoneLine);
+        zoneLine->attachAxis(axisX_);
+        zoneLine->attachAxis(axisY_);
+        zoneRefLines_.append(zoneLine);
+
+        double nextX = x + lengths.at(i);
+
+        QtCharts::QLineSeries *thresholdLine = new QtCharts::QLineSeries;
+        // ===== 新增：当前温区阈值横线 =====
+        QPen thresholdPen(QColor("#9C27B0"));
+        thresholdPen.setStyle(Qt::DotLine);
+        thresholdPen.setWidth(2);
+        thresholdLine->setPen(thresholdPen);
+        thresholdLine->setName(QString::fromUtf8("%1区阈值 %2°C").arg(i + 1).arg(thresholds.value(i), 0, 'f', 0));
+        thresholdLine->append(x, thresholds.value(i));
+        thresholdLine->append(nextX, thresholds.value(i));
+        chart_->addSeries(thresholdLine);
+        thresholdLine->attachAxis(axisX_);
+        thresholdLine->attachAxis(axisY_);
+        thresholdRefLines_.append(thresholdLine);
+
+        x = nextX;
+    }
+
+    QtCharts::QLineSeries *lastZoneLine = new QtCharts::QLineSeries;
+    QPen lastZonePen(QColor("#777777"));
+    lastZonePen.setStyle(Qt::DashLine);
+    lastZonePen.setWidth(1);
+    lastZoneLine->setPen(lastZonePen);
+    lastZoneLine->append(x, 0.0);
+    lastZoneLine->append(x, 300.0);
+    chart_->addSeries(lastZoneLine);
+    lastZoneLine->attachAxis(axisX_);
+    lastZoneLine->attachAxis(axisY_);
+    zoneRefLines_.append(lastZoneLine);
+}
+
+void TraceabilityPage::clearReferenceLineList(QList<QtCharts::QLineSeries*> &lines)
+{
+    for (int i = 0; i < lines.size(); ++i) {
+        chart_->removeSeries(lines.at(i));
+        delete lines.at(i);
+    }
+    lines.clear();
 }
 
 QColor TraceabilityPage::getNextLineColor()
@@ -376,7 +463,7 @@ void TraceabilityPage::showBoard(const QString &barcode)
     QVector<QPointF> pts;
     int n = qMin(r.timeAxis.size(), r.fullTemps.size());
     for (int i = 0; i < n; ++i) {
-        pts.append({r.timeAxis[i], r.fullTemps[i]});
+        pts.append(QPointF(r.timeAxis[i], r.fullTemps[i]));
     }
 
     QtCharts::QLineSeries *series = nullptr;
@@ -422,8 +509,10 @@ void TraceabilityPage::refreshSelectedBoardInfo()
 
 void TraceabilityPage::clearBoardDisplay()
 {
-    for (auto s : multiSeries_) chart_->removeSeries(s);
-    qDeleteAll(multiSeries_);
+    for (auto s : multiSeries_) {
+        chart_->removeSeries(s);
+        delete s;
+    }
     multiSeries_.clear();
 
     barcodeValue_->setText("--");
@@ -432,4 +521,6 @@ void TraceabilityPage::clearBoardDisplay()
     exitValue_->setText("--");
     durationValue_->setText("--");
     zoneValue_->setText("--");
+
+    updateAxisRange();
 }

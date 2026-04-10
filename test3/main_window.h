@@ -2,28 +2,34 @@
 
 #include <QMainWindow>
 
+QT_BEGIN_NAMESPACE
 class QStackedWidget;
 class QLabel;
 class QTimer;
-class QCloseEvent;
+QT_END_NAMESPACE
 
 #include "serial_manager.h"
 #include "board_trace_manager.h"
-#include "connection_page.h"
 #include "traceability_page.h"
+#include "connection_page.h"
+
+// ===== 新增：温区设置相关 =====
+#include "reflow_settings.h"
+#include "zone_settings_page.h"
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow(QWidget *parent = nullptr);
 
 protected:
-    void closeEvent(QCloseEvent *event);
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void switchToConnectionPage();
     void switchToTracePage();
+    void switchToZoneSettingsPage();
     void updateClock();
     void setStatusMessage(const QString &text);
     void setConnectionStatus(const QString &text, bool connected);
@@ -40,13 +46,19 @@ private:
     SerialManager serial_;
     BoardTraceManager traceManager_;
 
-    QStackedWidget *stacked_;
-    ConnectionPage *connPage_;
-    TraceabilityPage *tracePage_;
+    // ===== 新增：回流炉温区长度/阈值配置 =====
+    ReflowSettings reflowSettings_;
 
-    QLabel *msgLabel_;
-    QLabel *connLabel_;
-    QLabel *batteryLabel_;
-    QLabel *timeLabel_;
-    QTimer *clockTimer_;
+    QStackedWidget *stacked_ = nullptr;
+    ConnectionPage *connPage_ = nullptr;
+    TraceabilityPage *tracePage_ = nullptr;
+
+    // ===== 新增：阈值和温度区设置页面 =====
+    ZoneSettingsPage *zoneSettingsPage_ = nullptr;
+
+    QLabel *msgLabel_ = nullptr;
+    QLabel *connLabel_ = nullptr;
+    QLabel *batteryLabel_ = nullptr;
+    QLabel *timeLabel_ = nullptr;
+    QTimer *clockTimer_ = nullptr;
 };

@@ -22,16 +22,20 @@ SOURCES += \
     connection_page.cpp \
     main.cpp \
     main_window.cpp \
+    reflow_settings.cpp \
     serial_manager.cpp \
-    traceability_page.cpp
+    traceability_page.cpp \
+    zone_settings_page.cpp
 
 HEADERS += \
     board_record.h \
     board_trace_manager.h \
     connection_page.h \
     main_window.h \
+    reflow_settings.h \
     serial_manager.h \
-    traceability_page.h
+    traceability_page.h \
+    zone_settings_page.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

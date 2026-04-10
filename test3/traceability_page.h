@@ -14,14 +14,20 @@
 
 class SerialManager;
 class BoardTraceManager;
+class ReflowSettings;
 struct BoardRecord;
+
+// ===== 新增：曲线页支持温区设置联动 =====
 
 class TraceabilityPage : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, QWidget *parent = nullptr);
+    explicit TraceabilityPage(SerialManager *serial,
+                              BoardTraceManager *manager,
+                              ReflowSettings *settings,
+                              QWidget *parent = nullptr);
 
 signals:
     void requestSetStatusMessage(const QString &text);
@@ -39,10 +45,17 @@ private slots:
     void clearFinishedRecords();
     void exportCurrentBoard();
 
+    // ===== 新增：温区参数变化后重建图表参考线 =====
+    void refreshChartReferences();
+
 private:
     void initUi();
     void initChart();
-    void addZoneReferenceLines();
+
+    // ===== 新增：横坐标与温区参考线更新 =====
+    void updateAxisRange();
+    void rebuildReferenceLines();
+    void clearReferenceLineList(QList<QtCharts::QLineSeries*> &lines);
     QColor getNextLineColor();
     void showBoard(const QString &barcode);
     void refreshSelectedBoardInfo();
@@ -50,6 +63,7 @@ private:
 
     SerialManager *serial_;
     BoardTraceManager *manager_;
+    ReflowSettings *settings_;
 
     QLabel *batteryLabel_;
     QLabel *barcodeValue_;
@@ -63,7 +77,10 @@ private:
     QtCharts::QChart *chart_;
     QtCharts::QValueAxis *axisX_;
     QtCharts::QValueAxis *axisY_;
+
+    // ===== 新增：温区竖线 / 阈值横线 =====
     QList<QtCharts::QLineSeries*> zoneRefLines_;
+    QList<QtCharts::QLineSeries*> thresholdRefLines_;
 
     QTableWidget *table_;
 
