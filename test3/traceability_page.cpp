@@ -362,6 +362,8 @@ void TraceabilityPage::initUi()
     exitValue_ = new QLabel("--");
     durationValue_ = new QLabel("--");
     zoneValue_ = new QLabel("--");
+    peakTempValue_ = new QLabel("--");
+    maxSlopeValue_ = new QLabel("--");
 
     infoLayout->addWidget(new QLabel(QString::fromUtf8("条码：")), 0, 0);
     infoLayout->addWidget(barcodeValue_, 0, 1);
@@ -380,6 +382,11 @@ void TraceabilityPage::initUi()
     alarmValue_ = new QLabel("--");
     infoLayout->addWidget(new QLabel(QString::fromUtf8("报警信息：")), 2, 0);
     infoLayout->addWidget(alarmValue_, 2, 1, 1, 5);
+
+    infoLayout->addWidget(new QLabel(QString::fromUtf8("峰值温度：")), 3, 0);
+    infoLayout->addWidget(peakTempValue_, 3, 1);
+    infoLayout->addWidget(new QLabel(QString::fromUtf8("最大斜率：")), 3, 2);
+    infoLayout->addWidget(maxSlopeValue_, 3, 3);
 
     layout->addWidget(infoGroup);
 
@@ -629,6 +636,12 @@ void TraceabilityPage::refreshSelectedBoardInfo()
     durationValue_->setText(r.timeAxis.isEmpty() ? "--" : QString("%1 s").arg(r.timeAxis.last(), 0, 'f', 1));
     zoneValue_->setText(r.lastZone > 0 ? QString::number(r.lastZone) : "--");
 
+    // ===== 新增：计算并显示峰值温度和最大斜率 =====
+    double peakTemp = calculatePeakTemperature(r);
+    double maxSlope = calculateMaxSlope(r);
+    peakTempValue_->setText(peakTemp > 0 ? QString("%1 °C").arg(peakTemp, 0, 'f', 2) : "--");
+    maxSlopeValue_->setText(maxSlope > 0 ? QString("%1 °C/s").arg(maxSlope, 0, 'f', 2) : "--");
+
     const QString alarmText = buildAlarmText(r);
     alarmValue_->setText(alarmText);
     static const QString kNormalAlarm = QString::fromUtf8("正常");
@@ -653,8 +666,51 @@ void TraceabilityPage::clearBoardDisplay()
     exitValue_->setText("--");
     durationValue_->setText("--");
     zoneValue_->setText("--");
+    peakTempValue_->setText("--");
+    maxSlopeValue_->setText("--");
     alarmValue_->setText("--");
     alarmValue_->setStyleSheet("");
 
     updateAxisRange();
+}
+
+// ===== 新增：计算PCB峰值温度 =====
+double TraceabilityPage::calculatePeakTemperature(const BoardRecord &record) const
+{
+    if (record.fullTemps.isEmpty()) {
+        return 0.0;
+    }
+
+    double peakTemp = record.fullTemps.first();
+    for (int i = 0; i < record.fullTemps.size(); ++i) {
+        if (record.fullTemps.at(i) > peakTemp) {
+            peakTemp = record.fullTemps.at(i);
+        }
+    }
+    return peakTemp;
+}
+
+// ===== 新增：计算最大斜率（温度变化速率，单位：°C/s） =====
+double TraceabilityPage::calculateMaxSlope(const BoardRecord &record) const
+{
+    if (record.fullTemps.size() < 2 || record.timeAxis.size() < 2) {
+        return 0.0;
+    }
+
+    double maxSlope = 0.0;
+    int n = qMin(record.fullTemps.size(), record.timeAxis.size());
+
+    for (int i = 1; i < n; ++i) {
+        double tempDelta = record.fullTemps.at(i) - record.fullTemps.at(i - 1);
+        double timeDelta = record.timeAxis.at(i) - record.timeAxis.at(i - 1);
+
+        if (timeDelta > 0.0) {
+            double slope = qAbs(tempDelta / timeDelta);
+            if (slope > maxSlope) {
+                maxSlope = slope;
+            }
+        }
+    }
+
+    return maxSlope;
 }

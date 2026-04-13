@@ -63,6 +63,10 @@ private:
     void refreshSelectedBoardInfo();
     void clearBoardDisplay();
 
+    // ===== 新增：PCB温度计算函数 =====
+    double calculatePeakTemperature(const BoardRecord &record) const;
+    double calculateMaxSlope(const BoardRecord &record) const;
+
     SerialManager *serial_;
     BoardTraceManager *manager_;
     ReflowSettings *settings_;
@@ -75,6 +79,8 @@ private:
     QLabel *durationValue_;
     QLabel *zoneValue_;
     QLabel *alarmValue_;
+    QLabel *peakTempValue_;
+    QLabel *maxSlopeValue_;
 
     QtCharts::QChartView *chartView_;
     QtCharts::QChart *chart_;
