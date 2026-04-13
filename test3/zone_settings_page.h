@@ -24,6 +24,7 @@ private slots:
     void applySettings();
     void resetDefaults();
     void syncFromSettings();
+    void applyCenterOffsets();
 
 private:
     void initUi();
@@ -31,7 +32,10 @@ private:
     ReflowSettings *settings_;
     QVector<QDoubleSpinBox*> lengthEditors_;
     QVector<QDoubleSpinBox*> thresholdEditors_;
+    QVector<QDoubleSpinBox*> timeOffsetEditors_;
+    QDoubleSpinBox *displayExtraSpin_ = nullptr;
     QLabel *summaryLabel_;
+    QPushButton *centerOffsetsBtn_ = nullptr;
     QPushButton *applyBtn_;
     QPushButton *resetBtn_;
 };

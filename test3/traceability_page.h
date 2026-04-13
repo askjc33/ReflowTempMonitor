@@ -44,6 +44,7 @@ private slots:
     void onDisconnected();
     void clearFinishedRecords();
     void exportCurrentBoard();
+    void exportFinishedBoardsCsv();
 
     // ===== 新增：温区参数变化后重建图表参考线 =====
     void refreshChartReferences();
@@ -73,6 +74,7 @@ private:
     QLabel *exitValue_;
     QLabel *durationValue_;
     QLabel *zoneValue_;
+    QLabel *alarmValue_;
 
     QtCharts::QChartView *chartView_;
     QtCharts::QChart *chart_;

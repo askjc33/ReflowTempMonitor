@@ -29,7 +29,30 @@
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QPen>
-#include <QtMath>
+#include <QBrush>
+
+namespace {
+
+static const double kAxisXMaxSec = 150.0;
+
+static void writeBoardCsv(QTextStream &out, const BoardRecord &r, const QString &alarmText)
+{
+    out << "Barcode," << r.barcode << "\n";
+    out << "EnterTime," << (r.enterTime.isValid() ? r.enterTime.toString(Qt::ISODate) : "") << "\n";
+    out << "ExitTime," << (r.exitTime.isValid() ? r.exitTime.toString(Qt::ISODate) : "") << "\n";
+    out << "Status," << r.status << "\n";
+    out << "Alarm," << alarmText << "\n\n";
+    out << "ElapsedSec,Temp,Zone\n";
+
+    int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
+    for (int i = 0; i < n; ++i) {
+        out << QString::number(r.timeAxis.at(i), 'f', 3) << ","
+            << QString::number(r.fullTemps.at(i), 'f', 2) << ","
+            << r.zoneAxis.at(i) << "\n";
+    }
+}
+
+} // namespace
 
 TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *manager, ReflowSettings *settings, QWidget *parent)
     : QWidget(parent),
@@ -43,6 +66,7 @@ TraceabilityPage::TraceabilityPage(SerialManager *serial, BoardTraceManager *man
       exitValue_(nullptr),
       durationValue_(nullptr),
       zoneValue_(nullptr),
+      alarmValue_(nullptr),
       chartView_(nullptr),
       chart_(nullptr),
       axisX_(nullptr),
@@ -71,6 +95,8 @@ void TraceabilityPage::refreshView()
         table_->clearContents();
         table_->setRowCount(records.size());
 
+        static const QString kNormalAlarm = QString::fromUtf8("正常");
+
         for (int row = 0; row < records.size(); ++row) {
             const BoardRecord &r = records.at(row);
 
@@ -89,7 +115,13 @@ void TraceabilityPage::refreshView()
 
             table_->setItem(row, 5, new QTableWidgetItem(
                 r.lastZone > 0 ? QString::number(r.lastZone) : "-"));
-            table_->setItem(row, 6, new QTableWidgetItem(buildAlarmText(r)));
+
+            const QString alarmText = buildAlarmText(r);
+            QTableWidgetItem *alarmItem = new QTableWidgetItem(alarmText);
+            if (alarmText != kNormalAlarm) {
+                alarmItem->setForeground(QBrush(QColor("#c62828")));
+            }
+            table_->setItem(row, 6, alarmItem);
 
             if (selectedBarcodes_.contains(r.barcode)) {
                 table_->selectRow(row);
@@ -203,19 +235,7 @@ void TraceabilityPage::exportCurrentBoard()
             out << "\n";
         }
 
-        out << "Barcode," << r.barcode << "\n";
-        out << "EnterTime," << (r.enterTime.isValid() ? r.enterTime.toString(Qt::ISODate) : "") << "\n";
-        out << "ExitTime," << (r.exitTime.isValid() ? r.exitTime.toString(Qt::ISODate) : "") << "\n";
-        out << "Status," << r.status << "\n";
-        out << "Alarm," << buildAlarmText(r) << "\n\n";
-        out << "ElapsedSec,Temp,Zone\n";
-
-        int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
-        for (int i = 0; i < n; ++i) {
-            out << QString::number(r.timeAxis.at(i), 'f', 3) << ","
-                << QString::number(r.fullTemps.at(i), 'f', 2) << ","
-                << r.zoneAxis.at(i) << "\n";
-        }
+        writeBoardCsv(out, r, buildAlarmText(r));
 
         exportedAny = true;
     }
@@ -228,6 +248,60 @@ void TraceabilityPage::exportCurrentBoard()
     }
 
     QMessageBox::information(this, QString::fromUtf8("导出成功"), path);
+}
+
+void TraceabilityPage::exportFinishedBoardsCsv()
+{
+    QList<BoardRecord> records = manager_->allRecords();
+    QList<BoardRecord> finished;
+    static const QString kDone = QString::fromUtf8("已完成");
+    for (int i = 0; i < records.size(); ++i) {
+        const BoardRecord &r = records.at(i);
+        if (r.finished || r.status == kDone) {
+            finished.append(r);
+        }
+    }
+
+    if (finished.isEmpty()) {
+        QMessageBox::information(
+            this,
+            QString::fromUtf8("导出"),
+            QString::fromUtf8("当前没有状态为「已完成」的 PCBA 记录。"));
+        return;
+    }
+
+    QString path = QFileDialog::getSaveFileName(
+        this,
+        QString::fromUtf8("导出已完成板CSV"),
+        QString::fromUtf8("finished_boards.csv"),
+        QString::fromUtf8("CSV 文件 (*.csv)")
+    );
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, QString::fromUtf8("导出失败"), QString::fromUtf8("无法写入文件"));
+        return;
+    }
+
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+
+    for (int i = 0; i < finished.size(); ++i) {
+        if (i > 0) {
+            out << "\n";
+        }
+        const BoardRecord &r = finished.at(i);
+        writeBoardCsv(out, r, buildAlarmText(r));
+    }
+
+    file.close();
+    QMessageBox::information(
+        this,
+        QString::fromUtf8("导出成功"),
+        QString::fromUtf8("已导出 %1 条已完成记录。\n%2").arg(finished.size()).arg(path));
 }
 
 void TraceabilityPage::refreshChartReferences()
@@ -260,6 +334,10 @@ void TraceabilityPage::initUi()
     QPushButton *exportBtn = new QPushButton(QString::fromUtf8("导出当前板CSV"));
     connect(exportBtn, SIGNAL(clicked()), this, SLOT(exportCurrentBoard()));
     top->addWidget(exportBtn);
+
+    QPushButton *exportFinishedBtn = new QPushButton(QString::fromUtf8("导出已完成板CSV"));
+    connect(exportFinishedBtn, SIGNAL(clicked()), this, SLOT(exportFinishedBoardsCsv()));
+    top->addWidget(exportFinishedBtn);
 
     QPushButton *clearBtn = new QPushButton(QString::fromUtf8("清空完成记录"));
     connect(clearBtn, SIGNAL(clicked()), this, SLOT(clearFinishedRecords()));
@@ -298,6 +376,10 @@ void TraceabilityPage::initUi()
     infoLayout->addWidget(exitValue_, 1, 3);
     infoLayout->addWidget(new QLabel(QString::fromUtf8("过炉时长：")), 1, 4);
     infoLayout->addWidget(durationValue_, 1, 5);
+
+    alarmValue_ = new QLabel("--");
+    infoLayout->addWidget(new QLabel(QString::fromUtf8("报警信息：")), 2, 0);
+    infoLayout->addWidget(alarmValue_, 2, 1, 1, 5);
 
     layout->addWidget(infoGroup);
 
@@ -371,16 +453,8 @@ void TraceabilityPage::initChart()
 
 void TraceabilityPage::updateAxisRange()
 {
-    // ===== 新增：横坐标至少显示到 250s，并按 50s 向上取整 =====
-    double axisMax = qMax(250.0, settings_->totalDuration());
-    for (auto it = multiSeries_.constBegin(); it != multiSeries_.constEnd(); ++it) {
-        const QList<QPointF> points = it.value()->points();
-        if (!points.isEmpty()) {
-            axisMax = qMax(axisMax, points.last().x());
-        }
-    }
-
-    axisX_->setRange(0.0, qMax(250.0, qCeil(axisMax / 50.0) * 50.0));
+    // 横坐标固定 0~200 s，与温区长度设置无关
+    axisX_->setRange(0.0, kAxisXMaxSec);
 }
 
 void TraceabilityPage::rebuildReferenceLines()
@@ -501,10 +575,18 @@ void TraceabilityPage::showBoard(const QString &barcode)
     BoardRecord r;
     if (!manager_->getRecordByBarcode(barcode, r)) return;
 
+    const QVector<double> &zoneOff = settings_->zoneTimeOffsets();
+    const double extra = settings_->displayTimeExtra();
+
     QVector<QPointF> pts;
-    int n = qMin(r.timeAxis.size(), r.fullTemps.size());
+    int n = qMin(r.timeAxis.size(), qMin(r.fullTemps.size(), r.zoneAxis.size()));
     for (int i = 0; i < n; ++i) {
-        pts.append(QPointF(r.timeAxis[i], r.fullTemps[i]));
+        int zi = r.zoneAxis.at(i) - 1;
+        double dx = extra;
+        if (zi >= 0 && zi < zoneOff.size()) {
+            dx += zoneOff.at(zi);
+        }
+        pts.append(QPointF(r.timeAxis.at(i) + dx, r.fullTemps.at(i)));
     }
 
     QtCharts::QLineSeries *series = nullptr;
@@ -546,6 +628,15 @@ void TraceabilityPage::refreshSelectedBoardInfo()
     exitValue_->setText(r.exitTime.isValid() ? r.exitTime.toString("yyyy-MM-dd HH:mm:ss") : "--");
     durationValue_->setText(r.timeAxis.isEmpty() ? "--" : QString("%1 s").arg(r.timeAxis.last(), 0, 'f', 1));
     zoneValue_->setText(r.lastZone > 0 ? QString::number(r.lastZone) : "--");
+
+    const QString alarmText = buildAlarmText(r);
+    alarmValue_->setText(alarmText);
+    static const QString kNormalAlarm = QString::fromUtf8("正常");
+    if (alarmText == kNormalAlarm) {
+        alarmValue_->setStyleSheet("");
+    } else {
+        alarmValue_->setStyleSheet(QString::fromUtf8("color:#c62828;font-weight:bold;"));
+    }
 }
 
 void TraceabilityPage::clearBoardDisplay()
@@ -562,6 +653,8 @@ void TraceabilityPage::clearBoardDisplay()
     exitValue_->setText("--");
     durationValue_->setText("--");
     zoneValue_->setText("--");
+    alarmValue_->setText("--");
+    alarmValue_->setStyleSheet("");
 
     updateAxisRange();
 }

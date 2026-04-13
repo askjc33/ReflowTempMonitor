@@ -149,7 +149,7 @@ void MainWindow::setupMenu()
     connect(traceAct, &QAction::triggered, this, &MainWindow::switchToTracePage);
     viewMenu->addAction(traceAct);
 
-    QAction *zoneAct = new QAction(QString::fromUtf8("阈值和温度区设置(&Z)"), this);
+    QAction *zoneAct = new QAction(QString::fromUtf8("设置页(&Z)"), this);
     connect(zoneAct, &QAction::triggered, this, &MainWindow::switchToZoneSettingsPage);
     viewMenu->addAction(zoneAct);
 

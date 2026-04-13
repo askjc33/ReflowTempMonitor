@@ -1,0 +1,15 @@
+release/board_trace_manager.o
+release/connection_page.o
+release/main.o
+release/main_window.o
+release/reflow_settings.o
+release/serial_manager.o
+release/traceability_page.o
+release/zone_settings_page.o
+release/moc_board_trace_manager.o
+release/moc_connection_page.o
+release/moc_main_window.o
+release/moc_reflow_settings.o
+release/moc_serial_manager.o
+release/moc_traceability_page.o
+release/moc_zone_settings_page.o
