@@ -1,0 +1,15 @@
+--cpu Cortex-M3
+".\objects\main.o"
+".\objects\usart_comm.o"
+".\objects\ads124s08.o"
+".\objects\gd32f10x_it.o"
+".\objects\systick.o"
+".\objects\system_gd32f10x.o"
+".\objects\startup_gd32f10x_md.o"
+".\objects\gd32f10x_gpio.o"
+".\objects\gd32f10x_rcu.o"
+".\objects\gd32f10x_misc.o"
+".\objects\gd32f10x_usart.o"
+--ro-base 0x08000000 --entry 0x08000000 --rw-base 0x20000000 --entry Reset_Handler --first __Vectors --strict --summary_stderr --info summarysizes --map --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list ".\Listings\test.map" -o .\Objects\test.axf
