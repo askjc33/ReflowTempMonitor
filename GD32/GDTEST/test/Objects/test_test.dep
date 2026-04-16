@@ -1,335 +1,0 @@
-Dependencies for Project 'test', Target 'test': (DO NOT MODIFY !)
-F (.\APP\main.c)(0x69DF892D)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\main.o --omf_browse .\objects\main.crf --depend .\objects\main.d)
-I (.\BSP\systick.h)(0x6353C7FC)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (APP\usart_comm.h)(0x63FA1750)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-I (APP\ads124s08.h)(0x69DF888D)
-I (D:\MDK5\ARM\ARMCC\include\stdio.h)(0x5475F300)
-F (.\APP\usart_comm.c)(0x63FA16C4)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\usart_comm.o --omf_browse .\objects\usart_comm.crf --depend .\objects\usart_comm.d)
-I (APP\usart_comm.h)(0x63FA1750)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-F (.\APP\usart_comm.h)(0x63FA1750)()
-F (.\APP\ads124s08.c)(0x69DF8A3A)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\ads124s08.o --omf_browse .\objects\ads124s08.crf --depend .\objects\ads124s08.d)
-I (APP\ads124s08.h)(0x69DF888D)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-I (.\BSP\systick.h)(0x6353C7FC)
-F (.\APP\ads124s08.h)(0x69DF888D)()
-F (.\BSP\gd32f10x_it.c)(0x635563CA)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\gd32f10x_it.o --omf_browse .\objects\gd32f10x_it.crf --depend .\objects\gd32f10x_it.d)
-I (BSP\gd32f10x_it.h)(0x6353C7FA)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-I (BSP\main.h)(0x6353C7FA)
-I (BSP\systick.h)(0x6353C7FC)
-F (.\BSP\systick.c)(0x6353C7FC)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\systick.o --omf_browse .\objects\systick.crf --depend .\objects\systick.d)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-I (BSP\systick.h)(0x6353C7FC)
-F (..\Firmware\CMSIS\GD\GD32F10x\Source\system_gd32f10x.c)(0x6353C84E)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\system_gd32f10x.o --omf_browse .\objects\system_gd32f10x.crf --depend .\objects\system_gd32f10x.d)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-F (..\Firmware\CMSIS\GD\GD32F10x\Source\ARM\startup_gd32f10x_md.s)(0x6353C852)(--cpu Cortex-M3 -g --apcs=interwork -I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include--pd "__UVISION_VERSION SETA 514" --pd "GD32F10X_MD SETA 1" --pd "USE_STDPERIPH_DRIVER SETA 1"--list .\listings\startup_gd32f10x_md.lst --xref -o .\objects\startup_gd32f10x_md.o --depend .\objects\startup_gd32f10x_md.d)
-F (..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_gpio.c)(0x6353C83C)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\gd32f10x_gpio.o --omf_browse .\objects\gd32f10x_gpio.crf --depend .\objects\gd32f10x_gpio.d)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-F (..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_rcu.c)(0x6353C83E)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\gd32f10x_rcu.o --omf_browse .\objects\gd32f10x_rcu.crf --depend .\objects\gd32f10x_rcu.d)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-F (..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_misc.c)(0x6353C83C)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\gd32f10x_misc.o --omf_browse .\objects\gd32f10x_misc.crf --depend .\objects\gd32f10x_misc.d)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-F (..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_usart.c)(0x6353C840)(-c --cpu Cortex-M3 -g -O0 --apcs=interwork --split_sections -I.\APP -I.\BSP -I..\Firmware\CMSIS -I..\Firmware\GD32F10x_standard_peripheral\Include -I..\Firmware\CMSIS\GD\GD32F10x\Include-I D:\1zx\学习资料\正点原子\STM32\407\GDTEST\test\RTE-I D:\MDK5\ARM\PACK\GigaDevice\GD32F10x_DFP\2.0.3\Device\Include-I D:\MDK5\ARM\CMSIS\Include-D__UVISION_VERSION="514" -DGD32F10X_MD -DUSE_STDPERIPH_DRIVER-o .\objects\gd32f10x_usart.o --omf_browse .\objects\gd32f10x_usart.crf --depend .\objects\gd32f10x_usart.d)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_usart.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\gd32f10x.h)(0x6353C854)
-I (..\Firmware\CMSIS\core_cm3.h)(0x6353C84C)
-I (D:\MDK5\ARM\ARMCC\include\stdint.h)(0x5475F300)
-I (..\Firmware\CMSIS\core_cmInstr.h)(0x6353C84C)
-I (..\Firmware\CMSIS\core_cmFunc.h)(0x6353C84C)
-I (..\Firmware\CMSIS\GD\GD32F10x\Include\system_gd32f10x.h)(0x6353C854)
-I (.\BSP\gd32f10x_libopt.h)(0x6353C7FA)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fmc.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_pmu.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_bkp.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rcu.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exti.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_gpio.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_crc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dma.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dbg.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_adc.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_dac.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_fwdgt.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_wwdgt.h)(0x6353C84C)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_rtc.h)(0x6353C848)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_timer.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_i2c.h)(0x6353C846)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_spi.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_sdio.h)(0x6353C84A)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_exmc.h)(0x6353C844)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_can.h)(0x6353C842)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_enet.h)(0x6353C844)
-I (D:\MDK5\ARM\ARMCC\include\stdlib.h)(0x5475F300)
-I (..\Firmware\GD32F10x_standard_peripheral\Include\gd32f10x_misc.h)(0x6353C848)

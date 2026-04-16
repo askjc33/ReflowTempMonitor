@@ -15,3 +15,4 @@ void usart0_send_string(uint8_t *ch);
 void usart0_send_uint(uint32_t i_var);
 
 #endif
+

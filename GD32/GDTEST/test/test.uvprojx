@@ -434,6 +434,36 @@
               <FileType>5</FileType>
               <FilePath>.\APP\ads124s08.h</FilePath>
             </File>
+            <File>
+              <FileName>thermocouple.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\thermocouple.c</FilePath>
+            </File>
+            <File>
+              <FileName>pcb_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\pcb_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>speed_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\speed_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>thermocouple.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\thermocouple.h</FilePath>
+            </File>
+            <File>
+              <FileName>pcb_sensor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\pcb_sensor.h</FilePath>
+            </File>
+            <File>
+              <FileName>speed_sensor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\speed_sensor.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -488,6 +518,16 @@
               <FileName>gd32f10x_usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>gd32f10x_exti.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_exti.c</FilePath>
+            </File>
+            <File>
+              <FileName>gd32f10x_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Firmware\GD32F10x_standard_peripheral\Source\gd32f10x_timer.c</FilePath>
             </File>
           </Files>
         </Group>
