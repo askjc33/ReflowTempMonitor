@@ -12,6 +12,7 @@
 static volatile uint32_t g_last_tick = 0;
 static volatile uint32_t g_period_us = 0;
 static volatile uint8_t  g_speed_valid = 0;
+static volatile uint8_t speed_updated_flag = 0;
 
 static float g_mm_per_pulse = 1.0f;
 
@@ -98,7 +99,14 @@ void EXTI4_IRQHandler(void)
 
         g_last_tick = now;
         g_speed_valid = 1U;
-
+        speed_updated_flag = 1;
         exti_interrupt_flag_clear(EXTI_4);
     }
+}
+
+uint8_t speed_get_flag(void)
+{
+    uint8_t tmp = speed_updated_flag;
+    speed_updated_flag = 0;  // 读走自动清除
+    return tmp;
 }

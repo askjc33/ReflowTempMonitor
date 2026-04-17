@@ -11,6 +11,6 @@ void speed_set_mm_per_pulse(float val);
 /* 中断里已经自动更新时间，这里提供状态接口 */
 uint8_t speed_is_valid(void);
 uint32_t speed_get_period_us(void);
-
+uint8_t speed_get_flag(void);
 #endif
 

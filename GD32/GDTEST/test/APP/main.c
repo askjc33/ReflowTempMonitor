@@ -5,120 +5,194 @@
 #include "speed_sensor.h"
 #include "pcb_sensor.h"
 #include <stdio.h>
+#include <string.h>
 
-#define ADS_VREF_UV   2500000.0
-#define ADS_GAIN      8
-#define CJC_TEMP_C    25.0
+/************************ 配置参数 ************************/
+#define ADS_VREF_UV             2500000.0
+#define ADS_GAIN                8
+#define CJC_TEMP_C              25.0
+#define DATA_UPDATE_INTERVAL_MS 100
 
-// 全局变量，用于毫秒计数
+#define ZONE_COUNT              12
+#define MAX_BARCODE_LEN         16
+#define POS_STEP_MM             100.0f
+
+/************************ PCB结构（关键改造） ************************/
+typedef struct
+{
+    uint16_t id;
+    float remain_mm;   // 距离进入下一温区的剩余距离
+} pcb_node_t;
+
+/************************ 全局变量 ************************/
 __IO uint32_t systick_ms = 0;
 
-static void send_line(const char *s)
+static uint32_t g_seq = 1000;
+static float g_temps[ZONE_COUNT] = {0};
+
+/* 原输出数组（协议用） */
+static uint16_t g_zone_board_ids[ZONE_COUNT] = {0};
+
+/* 新模型：每个温区一个PCB节点 */
+static pcb_node_t g_pcb_nodes[ZONE_COUNT];
+
+static float g_speed_mm_s = 0.0f;
+static uint16_t g_next_board_id = 1;
+
+/************************ 基础函数 ************************/
+static void send_string(const char *s)
 {
     usart0_send_string((uint8_t *)s);
 }
 
-int main(void)
+static void make_barcode(uint16_t id, char *barcode)
+{
+    sprintf(barcode, "PCB%03u", id);
+}
+
+/************************ 温度采集 ************************/
+static void collect_12ch_temperature(float temps[ZONE_COUNT])
 {
     uint8_t ch;
-    char buf[128];
 
-    systick_config();
-    usart0_init(9600);
-    ads124s08_init_all();
+    for (ch = 0; ch < 6; ch++)
+    {
+        int32_t code = ads124s08_read_data(ADS_DEV_A);
+        temps[ch] = (float)k_tc_compensated_temp_c(code, CJC_TEMP_C, ADS_VREF_UV, ADS_GAIN);
+    }
 
-    send_line("THERMOCOUPLE MODE 12CH\r\n");
-
-    while (1) {
-        for (ch = 0; ch < 6; ch++) {
-            int32_t code;
-            double uv;
-            double temp_c;
-
-            ads124s08_set_diff_channel(ADS_DEV_A, ch);
-            code = ads124s08_read_data(ADS_DEV_A);
-            uv = ads_code_to_uv(code, ADS_VREF_UV, ADS_GAIN);
-            temp_c = k_tc_compensated_temp_c(code, CJC_TEMP_C, ADS_VREF_UV, ADS_GAIN);
-
-            snprintf(buf, sizeof(buf),
-                     "A%u code=%ld uv=%.2f T=%.2fC\r\n",
-                     ch, (long)code, uv, temp_c);
-            send_line(buf);
-        }
-
-        for (ch = 0; ch < 6; ch++) {
-            int32_t code;
-            double uv;
-            double temp_c;
-
-            ads124s08_set_diff_channel(ADS_DEV_B, ch);
-            code = ads124s08_read_data(ADS_DEV_B);
-            uv = ads_code_to_uv(code, ADS_VREF_UV, ADS_GAIN);
-            temp_c = k_tc_compensated_temp_c(code, CJC_TEMP_C, ADS_VREF_UV, ADS_GAIN);
-
-            snprintf(buf, sizeof(buf),
-                     "B%u code=%ld uv=%.2f T=%.2fC\r\n",
-                     ch, (long)code, uv, temp_c);
-            send_line(buf);
-        }
-
-        send_line("\r\n");
-        delay_1ms(1000);
+    for (ch = 0; ch < 6; ch++)
+    {
+        int32_t code = ads124s08_read_data(ADS_DEV_B);
+        temps[ch + 6] = (float)k_tc_compensated_temp_c(code, CJC_TEMP_C, ADS_VREF_UV, ADS_GAIN);
     }
 }
 
+/************************ PCB位置更新（核心重构） ************************/
+static void update_pcb_position(void)
+{
+    uint8_t i;
+    float move;
 
+    /* 1 进板 */
+    if (pcb_enter_event())
+    {
+        if (g_pcb_nodes[0].id == 0)
+        {
+            g_pcb_nodes[0].id = g_next_board_id++;
+            g_pcb_nodes[0].remain_mm = POS_STEP_MM;
 
-//#include "gd32f10x.h"
-//#include "systick.h"
-//#include "usart_comm.h"
-//#include "speed_sensor.h"
-//#include "pcb_sensor.h"
-//#include <stdio.h>
+            if (g_next_board_id > 999)
+                g_next_board_id = 1;
+        }
+    }
 
-//static void uart_send_line(const char *s)
-//{
-//    usart0_send_string((uint8_t *)s);
-//}
+    /* 计算本周期位移 */
+    move = g_speed_mm_s * (DATA_UPDATE_INTERVAL_MS / 1000.0f);
 
-//int main(void)
-//{
-//    char buf[64];
-//    float speed;
+    /* 2 所有PCB独立移动（关键） */
+    for (i = 0; i < ZONE_COUNT; i++)
+    {
+        if (g_pcb_nodes[i].id != 0)
+        {
+            g_pcb_nodes[i].remain_mm -= move;
+        }
+    }
+			/* 3 先处理最后一个温区（必须在推进前） */
+			if (g_pcb_nodes[ZONE_COUNT - 1].id != 0 &&
+					g_pcb_nodes[ZONE_COUNT - 1].remain_mm <= 0)
+			{
+					g_pcb_nodes[ZONE_COUNT - 1].id = 0;
+			}
+    /* 4 推进（逐个判断） */
+    for (i = ZONE_COUNT - 1; i > 0; i--)
+    {
+        if (g_pcb_nodes[i - 1].id != 0 &&
+            g_pcb_nodes[i - 1].remain_mm <= 0)
+        {
+            /* 移动到下一温区 */
+            g_pcb_nodes[i] = g_pcb_nodes[i - 1];
+            g_pcb_nodes[i].remain_mm = POS_STEP_MM;
 
-//    systick_config();
-//    usart0_init(115200);
+            /* 清空原位置 */
+            g_pcb_nodes[i - 1].id = 0;
+        }
+    }
 
-//    uart_send_line("system start\r\n");
+    /* 5 同步到原数组（协议输出） */
+    for (i = 0; i < ZONE_COUNT; i++)
+    {
+        g_zone_board_ids[i] = g_pcb_nodes[i].id;
+    }
+}
 
-//    speed_sensor_init();
-//    pcb_sensor_init();
+/************************ 发送数据 ************************/
+static void send_protocol_packet(void)
+{
+    char tx_buf[512];
+    char barcode[MAX_BARCODE_LEN];
+    int len = 0;
+    int i;
 
-//    /*
-//     * 这里先填一个临时值。
-//     * 你后面根据编码轮/输送机构实际标定修改。
-//     */
-//    speed_set_mm_per_pulse(1.0f);
+    g_seq++;
 
-//    uart_send_line("speed sensor init ok\r\n");
-//    uart_send_line("pcb sensor init ok\r\n");
+    /* TEMP */
+    len += sprintf(&tx_buf[len], "TEMP,%lu", (unsigned long)g_seq);
+    for (i = 0; i < ZONE_COUNT; i++)
+    {
+        len += sprintf(&tx_buf[len], ",%.1f", g_temps[i]);
+    }
+    len += sprintf(&tx_buf[len], "\r\n");
 
-//    while (1) {
-//        speed = speed_get_mm_s();
+    /* POS */
+    len += sprintf(&tx_buf[len], "POS,%lu", (unsigned long)g_seq);
+    for (i = 0; i < ZONE_COUNT; i++)
+    {
+        if (g_zone_board_ids[i] == 0)
+        {
+            len += sprintf(&tx_buf[len], ",EMPTY");
+        }
+        else
+        {
+            make_barcode(g_zone_board_ids[i], barcode);
+            len += sprintf(&tx_buf[len], ",%s", barcode);
+        }
+    }
+    len += sprintf(&tx_buf[len], "\r\n");
 
-//        snprintf(buf, sizeof(buf), "speed=%.2f mm/s, period=%lu us\r\n",
-//                 speed, (unsigned long)speed_get_period_us());
-//        uart_send_line(buf);
+    /* SPEED */
+    len += sprintf(&tx_buf[len], "SPEED,%.1f\r\n", g_speed_mm_s);
 
-//        if (pcb_enter_event()) {
-//            uart_send_line("PCB ENTER\r\n");
-//        }
+    send_string(tx_buf);
+}
 
-//        if (pcb_leave_event()) {
-//            uart_send_line("PCB LEAVE\r\n");
-//        }
+/************************ 主函数 ************************/
+int main(void)
+{
+    systick_config();
+    usart0_init(9600);
+    ads124s08_init_all();
+    speed_sensor_init();
+    pcb_sensor_init();
 
-//        delay_1ms(500);
-//    }
-//}
+    speed_set_mm_per_pulse(1.0f);
 
+    send_string("ReflowTempMonitor Stable Start\r\n");
+
+    while (1)
+    {
+        collect_12ch_temperature(g_temps);
+
+        /* 实际运行请打开 */
+        //g_speed_mm_s = speed_get_mm_s();
+
+        /* 测试用（可删） */
+         g_speed_mm_s = 43.5f;
+
+        update_pcb_position();
+
+        send_protocol_packet();
+
+        delay_1ms(DATA_UPDATE_INTERVAL_MS);
+    }
+}

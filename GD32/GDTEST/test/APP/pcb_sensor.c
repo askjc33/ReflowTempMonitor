@@ -78,3 +78,10 @@ void EXTI5_9_IRQHandler(void)
         exti_interrupt_flag_clear(EXTI_5);
     }
 }
+
+uint8_t pcb_get_flag(void)
+{
+    uint8_t tmp = g_enter_flag|g_leave_flag;
+  
+    return tmp;
+}
